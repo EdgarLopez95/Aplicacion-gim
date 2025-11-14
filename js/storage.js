@@ -19,34 +19,6 @@ import {
     deleteObject
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js';
 
-// Datos de ejemplo para los entrenos
-export const entrenosEjemplo = [
-    {
-        id: 1,
-        nombre: 'Piernas',
-        imagen: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=800&q=80',
-        descripcion: 'Entreno de piernas completo'
-    },
-    {
-        id: 2,
-        nombre: 'Push',
-        imagen: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=800&q=80',
-        descripcion: 'Pecho, hombro y tríceps'
-    },
-    {
-        id: 3,
-        nombre: 'Pull',
-        imagen: 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=800&q=80',
-        descripcion: 'Espalda y bíceps'
-    },
-    {
-        id: 4,
-        nombre: 'Glúteo',
-        imagen: 'https://images.unsplash.com/photo-1518611012118-696072aa579a?w=800&q=80',
-        descripcion: 'Entreno enfocado en glúteos'
-    }
-];
-
 // Función para guardar entrenos en Firestore
 export async function guardarEntrenos(entrenos) {
     try {
@@ -99,23 +71,6 @@ export async function cargarEntrenos() {
         return entrenos;
     } catch (error) {
         console.error('Error al cargar entrenos desde Firestore:', error);
-        throw error;
-    }
-}
-
-// Función para inicializar datos en Firestore
-export async function inicializarDatos() {
-    try {
-        const entrenosExistentes = await cargarEntrenos();
-        if (!entrenosExistentes || entrenosExistentes.length === 0) {
-            await guardarEntrenos(entrenosEjemplo);
-            console.log('Datos de ejemplo guardados en Firestore');
-            return entrenosEjemplo;
-        }
-        console.log('Datos cargados desde Firestore');
-        return entrenosExistentes;
-    } catch (error) {
-        console.error('Error al inicializar datos:', error);
         throw error;
     }
 }

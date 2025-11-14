@@ -4,14 +4,48 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>App de Gimnasio</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Bowlby+One+SC&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Karantina:wght@400&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
+
     <link rel="stylesheet" href="css/main.css">
 </head>
 <body>
+    <div id="global-loader">
+        <div class="loader-spinner"></div>
+    </div>
+    
+    <!-- Header principal global -->
+    <header id="main-header" class="main-header">
+        <div class="header-left">
+            <img src="https://firebasestorage.googleapis.com/v0/b/aplicacion-gim-d3e48.firebasestorage.app/o/foto-perfil.jpg?alt=media&token=fca49d32-9df9-4563-88ad-30f3036c222f" alt="Edgar" class="profile-pic" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2750%27 height=%2750%27%3E%3Ccircle cx=%2725%27 cy=%2725%27 r=%2725%27 fill=%27%231C1C1E%27/%3E%3Ctext x=%2725%27 y=%2730%27 text-anchor=%27middle%27 fill=%27white%27 font-size=%2720%27%3EE%3C/text%3E%3C/svg%3E'">
+            <div class="header-info">
+                <span class="header-greeting">¡Hola, Edgar!</span>
+            </div>
+        </div>
+        <button id="back-button" class="btn-icon" style="display: none;">← Volver</button>
+    </header>
+    
     <div id="dashboard-view" class="view"></div>
 
     <div id="entreno-view" class="view"></div>
 
     <div id="ejercicio-view" class="view"></div>
+
+    <!-- Modal de confirmación -->
+    <div id="confirmation-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <h3 id="modal-title">Eliminar</h3>
+            <p id="modal-message">¿Estás seguro?</p>
+            <div class="modal-buttons">
+                <button id="modal-btn-no" class="btn-secondary">No, cancelar</button>
+                <button id="modal-btn-yes" class="btn-danger">Sí, Eliminar</button>
+            </div>
+        </div>
+    </div>
 
     <script type="module" src="js/main.js"></script>
 </body>

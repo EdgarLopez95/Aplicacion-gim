@@ -1,7 +1,7 @@
 // main.js - Orquestación principal de la aplicación
 
 import {
-    inicializarDatos,
+    cargarEntrenos,
     obtenerEjerciciosDeEntreno,
     obtenerEjercicio,
     agregarEjercicioAEntreno,
@@ -23,6 +23,9 @@ import {
     renderizarListaRegistros,
     mostrarModal,
     ocultarModal,
+    mostrarModalRegistro,
+    ocultarModalRegistro,
+    showConfirmationModal,
     poblarFormularioEjercicio,
     obtenerValoresFormulario,
     configurarModalNuevoEjercicio,
@@ -32,9 +35,7 @@ import {
     getEjercicioView,
     getModalNuevoEjercicio,
     getFormNuevoEjercicio,
-    getBtnVolverDashboard,
     getBtnAnadirEjercicio,
-    getBtnVolverEntreno,
     getFormNuevoRegistro
 } from './ui.js';
 
@@ -49,19 +50,12 @@ let currentlyEditingRegistroId = null;
 
 // Función para configurar event listeners de la vista de entreno
 function configurarEventListenersEntrenoView() {
-    const btnVolver = getBtnVolverDashboard();
     const btnAnadir = getBtnAnadirEjercicio();
     btnCancelarEjercicio = document.getElementById('btn-cancelar-ejercicio');
     const formNuevoEjercicio = getFormNuevoEjercicio();
     const modalNuevoEjercicio = getModalNuevoEjercicio();
     
     // Asignar event listeners (el HTML se regenera cada vez, así que no hay duplicados)
-    if (btnVolver) {
-        btnVolver.addEventListener('click', function() {
-            showView(getDashboardView());
-        });
-    }
-    
     if (btnAnadir) {
         btnAnadir.addEventListener('click', function() {
             // Resetear el ID de edición a null para crear un nuevo ejercicio
@@ -197,7 +191,6 @@ function configurarDragAndDropEjercicios() {
             console.log('Ejercicios reordenados');
         } catch (error) {
             console.error('Error al reordenar ejercicios:', error);
-            alert('Error al reordenar los ejercicios. Por favor, intenta de nuevo.');
         }
     });
     
@@ -317,7 +310,6 @@ function configurarDragAndDropEjercicios() {
             console.log('Ejercicios reordenados (táctil)');
         } catch (error) {
             console.error('Error al reordenar ejercicios:', error);
-            alert('Error al reordenar los ejercicios. Por favor, intenta de nuevo.');
         } finally {
             // Resetear estado
             draggedElement = null;
@@ -449,7 +441,6 @@ async function manejarSubmitFormulario(e) {
     } catch (error) {
         // 3. Manejar el error
         console.error('Error al guardar:', error);
-        alert(error.message || 'Error al guardar el ejercicio. Por favor, intenta de nuevo.');
     } finally {
         // 4. Quitar estado de carga (SIEMPRE se ejecuta)
         if (boton) {
@@ -507,14 +498,29 @@ async function mostrarVistaEjercicio(ejercicioId) {
 
 // Función para configurar event listeners de la vista de ejercicio
 function configurarEventListenersEjercicioView() {
-    const btnVolver = getBtnVolverEntreno();
     const formNuevoRegistro = getFormNuevoRegistro();
+    const btnAbrirModalRegistro = document.getElementById('btn-abrir-modal-registro');
+    const btnCancelarRegistro = document.getElementById('btn-cancelar-registro');
     
-    // Botón volver
-    if (btnVolver) {
-        btnVolver.addEventListener('click', function() {
-            // Volver a la vista de entreno
-            mostrarVistaEntreno(entrenoActual);
+    // Botón para abrir modal de registro
+    if (btnAbrirModalRegistro) {
+        btnAbrirModalRegistro.addEventListener('click', function() {
+            // Resetear el estado de edición
+            currentlyEditingRegistroId = null;
+            // Resetear el formulario y abrir el modal
+            ocultarModalRegistro(); // Primero resetear
+            setTimeout(() => {
+                mostrarModalRegistro();
+            }, 10);
+        });
+    }
+    
+    // Botón cancelar del modal
+    if (btnCancelarRegistro) {
+        btnCancelarRegistro.addEventListener('click', function() {
+            // Resetear el estado de edición
+            currentlyEditingRegistroId = null;
+            ocultarModalRegistro();
         });
     }
     
@@ -600,10 +606,12 @@ async function manejarSubmitRegistro(e) {
             boton.textContent = 'Guardar Registro';
         }
         
+        // Cerrar el modal después de guardar
+        ocultarModalRegistro();
+        
     } catch (error) {
         // 3. Manejar el error
         console.error('Error al guardar el registro:', error);
-        alert('Error al guardar el registro. Por favor, intenta de nuevo.');
     } finally {
         // 4. Quitar estado de carga (SIEMPRE se ejecuta)
         if (boton) {
@@ -677,8 +685,8 @@ function editarRegistro(registroId) {
         btnSubmit.textContent = 'Actualizar Registro';
     }
     
-    // Hacer scroll al formulario
-    form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // Abrir el modal para editar
+    mostrarModalRegistro();
 }
 
 // Función para eliminar un registro
@@ -688,7 +696,8 @@ async function eliminarRegistro(registroId, botonElement) {
         return;
     }
     
-    if (!confirm('¿Estás seguro de que quieres eliminar este registro?')) {
+    const confirmed = await showConfirmationModal('Eliminar Registro', '¿Estás seguro de que quieres eliminar este registro?');
+    if (!confirmed) {
         return;
     }
     
@@ -733,7 +742,6 @@ async function eliminarRegistro(registroId, botonElement) {
     } catch (error) {
         // 3. Manejar el error
         console.error('Error al eliminar el registro:', error);
-        alert('Error al eliminar el registro. Por favor, intenta de nuevo.');
     } finally {
         // 4. Quitar estado de carga (SIEMPRE se ejecuta)
         if (boton) {
@@ -744,7 +752,8 @@ async function eliminarRegistro(registroId, botonElement) {
 
 // Función para eliminar un ejercicio
 async function eliminarEjercicio(ejercicioId, botonElement) {
-    if (!confirm('¿Estás seguro de que quieres eliminar este ejercicio?')) {
+    const confirmed = await showConfirmationModal('Eliminar Ejercicio', '¿Estás seguro de que quieres eliminar este ejercicio?');
+    if (!confirmed) {
         return;
     }
     
@@ -765,7 +774,6 @@ async function eliminarEjercicio(ejercicioId, botonElement) {
     } catch (error) {
         // 3. Manejar el error
         console.error('Error al eliminar el ejercicio:', error);
-        alert('Error al eliminar el ejercicio. Por favor, intenta de nuevo.');
     } finally {
         // 4. Quitar estado de carga (SIEMPRE se ejecuta)
         if (boton) {
@@ -800,14 +808,33 @@ async function editarEjercicio(ejercicioId) {
 // Función para inicializar la aplicación
 async function initApp() {
     try {
-        // Inicializar datos en Firestore (si no existen)
-        const entrenos = await inicializarDatos();
+        // Cargar entrenos desde Firestore
+        const entrenos = await cargarEntrenos() || [];
         
         // Renderizar la vista completa del dashboard
         renderizarDashboardView(entrenos, mostrarVistaEntreno);
         
         // Asegurar que solo el dashboard esté visible al cargar
         showView(getDashboardView());
+        
+        // Configurar botón "Volver" del header principal
+        const backButton = document.getElementById('back-button');
+        if (backButton) {
+            backButton.addEventListener('click', function() {
+                // Si estamos en la vista de ejercicio, volver a la vista de entreno
+                const ejercicioView = document.getElementById('ejercicio-view');
+                if (ejercicioView && ejercicioView.classList.contains('active')) {
+                    if (entrenoActual) {
+                        mostrarVistaEntreno(entrenoActual);
+                    } else {
+                        showView(getDashboardView());
+                    }
+                } else {
+                    // Si estamos en la vista de entreno, volver al dashboard
+                    showView(getDashboardView());
+                }
+            });
+        }
         
         // NOTA: Los event listeners de la vista de entreno (botones, modal, formulario)
         // se configuran en configurarEventListenersEntrenoView(), que se llama
@@ -827,7 +854,12 @@ async function initApp() {
         }
     } catch (error) {
         console.error('Error al inicializar la aplicación:', error);
-        alert('Error al cargar la aplicación. Por favor, recarga la página.');
+    } finally {
+        // Ocultar el loader global
+        const loader = document.getElementById('global-loader');
+        if (loader) {
+            loader.style.display = 'none';
+        }
     }
 }
 

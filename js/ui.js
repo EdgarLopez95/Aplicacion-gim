@@ -39,6 +39,18 @@ export function showView(viewToShow) {
     if (viewToShow) {
         viewToShow.classList.add('active');
     }
+    
+    // Mostrar/ocultar botón "Volver" según la vista activa
+    const backButton = document.getElementById('back-button');
+    if (backButton) {
+        // Obtener el ID de la vista activa para comparar
+        const viewId = viewToShow ? viewToShow.id : null;
+        if (viewId === 'dashboard-view') {
+            backButton.style.display = 'none';
+        } else {
+            backButton.style.display = 'block';
+        }
+    }
 }
 
 // Función para renderizar la vista completa del dashboard
@@ -95,17 +107,22 @@ export function renderizarEntrenoView(entreno, ejercicios, onEditarClick, onElim
                 </div>
                 <div class="ejercicio-card-actions">
                     <button class="btn-editar" data-ejercicio-id="${ejercicio.id}" title="Editar">
-                        ✏️
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                        </svg>
                     </button>
                     <button class="btn-eliminar" data-ejercicio-id="${ejercicio.id}" title="Eliminar">
-                        🗑️
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
                     </button>
                 </div>
             </div>
         `).join('');
     
     const entrenoHTML = `
-        <button id="btn-volver-dashboard" class="btn-volver">← Volver</button>
         <h2 id="entreno-titulo">${entreno.nombre}</h2>
         <div id="lista-ejercicios" class="lista-ejercicios">
             ${ejerciciosHTML}
@@ -221,10 +238,16 @@ export function renderizarEjercicioView(ejercicio, registros, onEditarRegistroCl
                                     <td class="notas-cell">${registro.notas || '-'}</td>
                                     <td class="acciones-cell">
                                         <button class="btn-editar-registro" data-registro-id="${registro.id}" title="Editar">
-                                            ✏️
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                            </svg>
                                         </button>
                                         <button class="btn-eliminar-registro" data-registro-id="${registro.id}" title="Eliminar">
-                                            🗑️
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                <polyline points="3 6 5 6 21 6"></polyline>
+                                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                            </svg>
                                         </button>
                                     </td>
                                 </tr>
@@ -237,46 +260,54 @@ export function renderizarEjercicioView(ejercicio, registros, onEditarRegistroCl
         : '<p style="color: var(--text-secondary); text-align: center; padding: 20px;">No hay registros aún</p>';
     
     const ejercicioHTML = `
-        <button id="btn-volver-entreno" class="btn-volver">← Volver</button>
         <h2 id="ejercicio-titulo">${ejercicio.nombre}</h2>
         <img src="${ejercicio.imagenUrl || ejercicio.imagenBase64}" alt="${ejercicio.nombre}" class="ejercicio-view-image">
-        
-        <form id="form-nuevo-registro" class="form-registro">
-            <h3>Nuevo Registro</h3>
-            
-            <div class="form-group">
-                <label for="fecha-registro">Fecha</label>
-                <input type="date" id="fecha-registro" name="fecha" value="${hoy}" required>
-            </div>
-            
-            <div class="form-group">
-                <label>Series</label>
-                <div class="series-container">
-                    ${[1, 2, 3, 4].map(num => `
-                        <div class="serie-input">
-                            <label>Serie ${num}</label>
-                            <div class="serie-inputs">
-                                <input type="number" id="peso-serie-${num}" name="peso-${num}" placeholder="Peso (kg)" min="0" step="0.5">
-                                <span>x</span>
-                                <input type="number" id="rep-serie-${num}" name="rep-${num}" placeholder="Reps" min="0">
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-            
-            <div class="form-group">
-                <label for="notas-registro">Notas</label>
-                <textarea id="notas-registro" name="notas" rows="3" placeholder="Notas adicionales..."></textarea>
-            </div>
-            
-            <button type="submit" class="btn">Guardar Registro</button>
-        </form>
         
         <div class="registros-section">
             <h3>Historial de Registros</h3>
             <div id="lista-registros" class="lista-registros">
                 ${registrosHTML}
+            </div>
+        </div>
+        
+        <button id="btn-abrir-modal-registro" class="btn btn-anadir">Añadir Registro</button>
+        
+        <!-- Modal para nuevo registro -->
+        <div id="modal-nuevo-registro" class="modal">
+            <div class="modal-content">
+                <h3>Nuevo Registro</h3>
+                <form id="form-nuevo-registro" class="form-registro">
+                    <div class="form-group">
+                        <label for="fecha-registro">Fecha</label>
+                        <input type="date" id="fecha-registro" name="fecha" value="${hoy}" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Series</label>
+                        <div class="series-container">
+                            ${[1, 2, 3, 4].map(num => `
+                                <div class="serie-input">
+                                    <label>Serie ${num}</label>
+                                    <div class="serie-inputs">
+                                        <input type="number" id="peso-serie-${num}" name="peso-${num}" placeholder="Peso (kg)" min="0" step="0.5">
+                                        <span>x</span>
+                                        <input type="number" id="rep-serie-${num}" name="rep-${num}" placeholder="Reps" min="0">
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="notas-registro">Notas</label>
+                        <textarea id="notas-registro" name="notas" rows="3" placeholder="Notas adicionales..."></textarea>
+                    </div>
+                    
+                    <div class="modal-buttons">
+                        <button type="button" id="btn-cancelar-registro" class="btn btn-secondary">Cancelar</button>
+                        <button type="submit" class="btn">Guardar Registro</button>
+                    </div>
+                </form>
             </div>
         </div>
     `;
@@ -358,10 +389,16 @@ export function renderizarListaRegistros(registros, onEditarRegistroClick, onEli
                                     <td class="notas-cell">${registro.notas || '-'}</td>
                                     <td class="acciones-cell">
                                         <button class="btn-editar-registro" data-registro-id="${registro.id}" title="Editar">
-                                            ✏️
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                            </svg>
                                         </button>
                                         <button class="btn-eliminar-registro" data-registro-id="${registro.id}" title="Eliminar">
-                                            🗑️
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                <polyline points="3 6 5 6 21 6"></polyline>
+                                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                            </svg>
                                         </button>
                                     </td>
                                 </tr>
@@ -431,10 +468,16 @@ export function renderizarEjercicios(ejercicios, onEditarClick, onEliminarClick,
             </div>
             <div class="ejercicio-card-actions">
                 <button class="btn-editar" data-ejercicio-id="${ejercicio.id}" title="Editar">
-                    ✏️
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                    </svg>
                 </button>
                 <button class="btn-eliminar" data-ejercicio-id="${ejercicio.id}" title="Eliminar">
-                    🗑️
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="3 6 5 6 21 6"></polyline>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                    </svg>
                 </button>
             </div>
         `;
@@ -501,6 +544,86 @@ export function ocultarModal() {
             delete inputImagenEjercicio.dataset.currentImage;
         }
     }
+}
+
+// Función para mostrar el modal de registro
+export function mostrarModalRegistro() {
+    const modalRegistro = document.getElementById('modal-nuevo-registro');
+    if (modalRegistro) {
+        modalRegistro.classList.add('active');
+    }
+}
+
+// Función para ocultar el modal de registro
+export function ocultarModalRegistro() {
+    const modalRegistro = document.getElementById('modal-nuevo-registro');
+    if (modalRegistro) {
+        modalRegistro.classList.remove('active');
+    }
+    
+    const formRegistro = document.getElementById('form-nuevo-registro');
+    if (formRegistro) {
+        formRegistro.reset();
+        // Restaurar fecha a hoy
+        const fechaInput = formRegistro.querySelector('#fecha-registro');
+        if (fechaInput) {
+            const hoy = new Date().toISOString().split('T')[0];
+            fechaInput.value = hoy;
+        }
+        
+        // Restaurar el texto del botón a "Guardar Registro"
+        const btnSubmit = formRegistro.querySelector('button[type="submit"]');
+        if (btnSubmit) {
+            btnSubmit.textContent = 'Guardar Registro';
+        }
+    }
+}
+
+// Función para mostrar modal de confirmación
+export function showConfirmationModal(title, message) {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('confirmation-modal');
+        const modalTitle = document.getElementById('modal-title');
+        const modalMessage = document.getElementById('modal-message');
+        const btnYes = document.getElementById('modal-btn-yes');
+        const btnNo = document.getElementById('modal-btn-no');
+        
+        if (!modal || !modalTitle || !modalMessage || !btnYes || !btnNo) {
+            console.error('Elementos del modal de confirmación no encontrados');
+            resolve(false);
+            return;
+        }
+        
+        // Establecer título y mensaje
+        modalTitle.textContent = title;
+        modalMessage.textContent = message;
+        
+        // Mostrar el modal
+        modal.style.display = 'flex';
+        
+        // Función para cerrar el modal
+        const closeModal = (result) => {
+            modal.style.display = 'none';
+            // Remover listeners para evitar memory leaks
+            btnYes.removeEventListener('click', handleYes);
+            btnNo.removeEventListener('click', handleNo);
+            resolve(result);
+        };
+        
+        // Handler para "Sí"
+        const handleYes = () => {
+            closeModal(true);
+        };
+        
+        // Handler para "No"
+        const handleNo = () => {
+            closeModal(false);
+        };
+        
+        // Añadir listeners
+        btnYes.addEventListener('click', handleYes);
+        btnNo.addEventListener('click', handleNo);
+    });
 }
 
 // Función para poblar el formulario con datos de un ejercicio
@@ -582,11 +705,6 @@ export function getFormNuevoEjercicio() {
 }
 
 // Función para obtener referencias a botones de la vista de entreno
-export function getBtnVolverDashboard() {
-    actualizarReferenciasDOM();
-    return document.getElementById('btn-volver-dashboard');
-}
-
 export function getBtnAnadirEjercicio() {
     actualizarReferenciasDOM();
     return document.getElementById('btn-anadir-ejercicio');
@@ -595,11 +713,6 @@ export function getBtnAnadirEjercicio() {
 export function getEjercicioView() {
     actualizarReferenciasDOM();
     return ejercicioView;
-}
-
-export function getBtnVolverEntreno() {
-    actualizarReferenciasDOM();
-    return document.getElementById('btn-volver-entreno');
 }
 
 export function getFormNuevoRegistro() {
