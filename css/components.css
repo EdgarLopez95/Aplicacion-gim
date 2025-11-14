@@ -1,0 +1,294 @@
+/* components.css - Componentes reutilizables */
+
+/* Botones */
+.btn {
+    background-color: var(--accent-color);
+    color: var(--text-primary);
+    border: none;
+    border-radius: 8px;
+    padding: 12px 24px;
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    width: 100%;
+}
+
+.btn:hover {
+    background-color: var(--accent-hover);
+}
+
+.btn:active {
+    transform: scale(0.98);
+}
+
+.btn-secondary {
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+.btn-secondary:hover {
+    background-color: #3a3a3a;
+}
+
+.btn-volver {
+    background-color: transparent;
+    color: var(--text-secondary);
+    border: none;
+    padding: 8px 0;
+    font-size: 16px;
+    cursor: pointer;
+    align-self: flex-start;
+    transition: color 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.btn-volver:hover {
+    color: var(--text-primary);
+}
+
+.btn-anadir {
+    margin-top: auto;
+    width: 100%;
+    padding: 14px 24px;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.btn-editar,
+.btn-eliminar {
+    background-color: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 20px;
+    padding: 8px;
+    border-radius: 6px;
+    transition: background-color 0.2s ease, transform 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+}
+
+.btn-editar:hover {
+    background-color: rgba(74, 158, 255, 0.2);
+    transform: scale(1.1);
+}
+
+.btn-eliminar:hover {
+    background-color: rgba(255, 77, 77, 0.2);
+    transform: scale(1.1);
+}
+
+.btn-editar:active,
+.btn-eliminar:active {
+    transform: scale(0.95);
+}
+
+/* Tarjetas de entreno */
+.entreno-card {
+    background-color: var(--bg-card);
+    border-radius: 12px;
+    overflow: hidden;
+    width: 100%;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.entreno-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.entreno-card-image {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+    display: block;
+}
+
+.entreno-card-content {
+    padding: 16px;
+}
+
+.entreno-card-title {
+    color: var(--text-primary);
+    font-size: 18px;
+    font-weight: 500;
+    margin: 0;
+}
+
+/* Tarjetas de ejercicios */
+.ejercicio-card {
+    background-color: var(--bg-card);
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    transition: opacity 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.ejercicio-card.dragging {
+    opacity: 0.5;
+    transform: scale(0.95);
+}
+
+.ejercicio-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.ejercicio-card-image {
+    width: 80px;
+    height: 80px;
+    object-fit: cover;
+    border-radius: 8px;
+    flex-shrink: 0;
+}
+
+.ejercicio-card-content {
+    flex: 1;
+}
+
+.ejercicio-card-title {
+    color: var(--text-primary);
+    font-size: 18px;
+    font-weight: 500;
+    margin: 0;
+}
+
+.ejercicio-card-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+/* Modal */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.8);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+}
+
+.modal.active {
+    display: flex;
+}
+
+.modal-content {
+    background-color: var(--bg-card);
+    border-radius: 12px;
+    padding: 24px;
+    width: 100%;
+    max-width: 500px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+.modal-content h3 {
+    color: var(--text-primary);
+    font-size: 24px;
+    margin-bottom: 20px;
+    font-weight: 600;
+}
+
+.modal-buttons {
+    display: flex;
+    gap: 12px;
+    margin-top: 24px;
+}
+
+.modal-buttons .btn {
+    flex: 1;
+}
+
+/* Formularios */
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    color: var(--text-primary);
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 8px;
+}
+
+.form-group input[type="text"],
+.form-group input[type="file"],
+.form-group input[type="date"],
+.form-group input[type="number"] {
+    width: 100%;
+    padding: 12px;
+    background-color: var(--bg-secondary);
+    border: 1px solid #3a3a3a;
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-size: 16px;
+    font-family: inherit;
+    box-sizing: border-box;
+}
+
+.form-group input[type="text"]:focus,
+.form-group input[type="date"]:focus,
+.form-group input[type="number"]:focus {
+    outline: none;
+    border-color: var(--accent-color);
+}
+
+.form-group input[type="file"] {
+    cursor: pointer;
+}
+
+.form-group input[type="file"]::file-selector-button {
+    background-color: var(--accent-color);
+    color: var(--text-primary);
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    margin-right: 12px;
+    font-weight: 500;
+}
+
+.form-group input[type="file"]::file-selector-button:hover {
+    background-color: var(--accent-hover);
+}
+
+/* Responsive - Tablet y Desktop */
+@media (min-width: 768px) {
+    .btn {
+        width: auto;
+        padding: 12px 32px;
+    }
+
+    .btn-anadir {
+        width: auto;
+        align-self: flex-start;
+    }
+
+    .entreno-card-image {
+        height: 250px;
+    }
+}
+
+@media (min-width: 1024px) {
+    .entreno-card-image {
+        height: 280px;
+    }
+}
+

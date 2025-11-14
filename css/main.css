@@ -1,0 +1,61 @@
+/* main.css - Estilos globales de la aplicación */
+
+@import url('components.css');
+@import url('views.css');
+
+/* Reset y estilos base */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+    --bg-primary: #1a1a1a;
+    --bg-secondary: #2d2d2d;
+    --bg-card: #252525;
+    --text-primary: #ffffff;
+    --text-secondary: #b0b0b0;
+    --accent-color: #4a9eff;
+    --accent-hover: #3a8eef;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    min-height: 100vh;
+    line-height: 1.6;
+}
+
+.view {
+    display: none;
+    padding: 16px;
+    min-height: 100vh;
+}
+
+.view.active {
+    display: flex;
+    flex-direction: column;
+}
+
+h1 {
+    margin-bottom: 20px;
+    color: var(--text-primary);
+    font-size: 24px;
+    font-weight: 600;
+}
+
+/* Responsive - Tablet y Desktop */
+@media (min-width: 768px) {
+    .view {
+        padding: 24px;
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+
+    h1 {
+        font-size: 32px;
+    }
+}
+
