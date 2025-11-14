@@ -31,6 +31,7 @@
     flex: 1;
     width: 100%;
     margin-bottom: 16px;
+    padding-bottom: 80px; /* Espacio para el botón sticky */
 }
 
 /* Responsive - Tablet y Desktop */
@@ -45,6 +46,7 @@
 
     .lista-ejercicios {
         gap: 16px;
+        padding-bottom: 80px; /* Espacio para el botón sticky */
     }
 }
 
@@ -304,26 +306,30 @@
 
 .btn-editar-registro,
 .btn-eliminar-registro {
-    background-color: transparent;
-    border: none;
+    background-color: var(--bg-secondary);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     cursor: pointer;
-    font-size: 16px;
-    padding: 6px;
-    border-radius: 6px;
-    transition: background-color 0.2s ease, transform 0.2s ease;
-    display: inline-flex;
+    font-size: 14px;
+    padding: 0;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+    display: flex;
     align-items: center;
     justify-content: center;
-    margin: 0 2px;
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
 }
 
 .btn-editar-registro:hover {
     background-color: rgba(100, 181, 246, 0.2);
+    border-color: rgba(100, 181, 246, 0.4);
     transform: scale(1.1);
 }
 
 .btn-eliminar-registro:hover {
     background-color: rgba(255, 77, 77, 0.2);
+    border-color: rgba(255, 77, 77, 0.4);
     transform: scale(1.1);
 }
 

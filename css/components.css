@@ -55,31 +55,39 @@
     padding: 14px 24px;
     font-size: 16px;
     font-weight: 600;
+    position: sticky;
+    bottom: 0;
+    z-index: 10;
+    background-color: var(--accent-color);
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.3);
 }
 
 .btn-editar,
 .btn-eliminar {
-    background-color: transparent;
-    border: none;
+    background-color: var(--bg-secondary);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     cursor: pointer;
-    font-size: 20px;
-    padding: 8px;
-    border-radius: 6px;
-    transition: background-color 0.2s ease, transform 0.2s ease;
+    font-size: 18px;
+    padding: 0;
+    border-radius: 50%;
+    transition: all 0.2s ease;
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 36px;
-    height: 36px;
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
 }
 
 .btn-editar:hover {
     background-color: rgba(74, 158, 255, 0.2);
+    border-color: rgba(74, 158, 255, 0.4);
     transform: scale(1.1);
 }
 
 .btn-eliminar:hover {
     background-color: rgba(255, 77, 77, 0.2);
+    border-color: rgba(255, 77, 77, 0.4);
     transform: scale(1.1);
 }
 
@@ -95,12 +103,13 @@
     overflow: hidden;
     width: 100%;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    transition: all 0.2s ease-in-out;
+    cursor: pointer;
 }
 
 .entreno-card:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 0 0 2px var(--accent-color), 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
 .entreno-card-image {
@@ -166,6 +175,28 @@
     display: flex;
     gap: 8px;
     align-items: center;
+}
+
+/* Drag handle para reordenar ejercicios */
+.drag-handle {
+    cursor: grab;
+    padding: 8px 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+    font-size: 18px;
+    user-select: none;
+    flex-shrink: 0;
+    transition: color 0.2s ease;
+}
+
+.drag-handle:hover {
+    color: var(--text-primary);
+}
+
+.drag-handle:active {
+    cursor: grabbing;
 }
 
 /* Modal */
@@ -290,5 +321,70 @@
     .entreno-card-image {
         height: 280px;
     }
+}
+
+/* Estado de carga para botones */
+.btn.is-loading {
+    pointer-events: none;
+    opacity: 0.7;
+    position: relative;
+    color: transparent;
+}
+
+.btn.is-loading::after {
+    content: '';
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    top: 50%;
+    left: 50%;
+    margin-left: -10px;
+    margin-top: -10px;
+    border: 3px solid rgba(255, 255, 255, 0.3);
+    border-top-color: var(--text-primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Spinner para botones pequeños (editar/eliminar) */
+.btn-editar.is-loading,
+.btn-eliminar.is-loading,
+.btn-editar-registro.is-loading,
+.btn-eliminar-registro.is-loading {
+    pointer-events: none;
+    opacity: 0.7;
+    position: relative;
+}
+
+/* Ocultar el ícono cuando está cargando */
+.btn-editar.is-loading > *,
+.btn-eliminar.is-loading > *,
+.btn-editar-registro.is-loading > *,
+.btn-eliminar-registro.is-loading > * {
+    visibility: hidden;
+}
+
+.btn-editar.is-loading::after,
+.btn-eliminar.is-loading::after,
+.btn-editar-registro.is-loading::after,
+.btn-eliminar-registro.is-loading::after {
+    content: '';
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    top: 50%;
+    left: 50%;
+    margin-left: -8px;
+    margin-top: -8px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: var(--text-primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
 }
 

@@ -88,7 +88,8 @@ export function renderizarEntrenoView(entreno, ejercicios, onEditarClick, onElim
         ? '<p style="color: var(--text-secondary); text-align: center; padding: 20px;">No hay ejercicios agregados aún</p>'
         : ejercicios.map(ejercicio => `
             <div class="ejercicio-card" data-ejercicio-id="${ejercicio.id}" style="cursor: pointer;">
-                <img src="${ejercicio.imagenBase64}" alt="${ejercicio.nombre}" class="ejercicio-card-image">
+                <div class="drag-handle" draggable="true">⠿</div>
+                <img src="${ejercicio.imagenUrl || ejercicio.imagenBase64}" alt="${ejercicio.nombre}" class="ejercicio-card-image">
                 <div class="ejercicio-card-content">
                     <h3 class="ejercicio-card-title">${ejercicio.nombre}</h3>
                 </div>
@@ -145,8 +146,10 @@ export function renderizarEntrenoView(entreno, ejercicios, onEditarClick, onElim
             const cards = entrenoView.querySelectorAll('.ejercicio-card');
             cards.forEach(card => {
                 card.addEventListener('click', function(e) {
-                    // No navegar si se hace clic en los botones
-                    if (!e.target.closest('.ejercicio-card-actions')) {
+                    // No navegar si se hace clic en los botones, el drag handle o si se está arrastrando
+                    if (!e.target.closest('.ejercicio-card-actions') && 
+                        !e.target.closest('.drag-handle') && 
+                        !card.classList.contains('dragging')) {
                         const ejercicioId = parseInt(card.dataset.ejercicioId);
                         onEjercicioClick(ejercicioId);
                     }
@@ -159,7 +162,7 @@ export function renderizarEntrenoView(entreno, ejercicios, onEditarClick, onElim
             boton.addEventListener('click', function(e) {
                 e.stopPropagation();
                 const ejercicioId = parseInt(this.dataset.ejercicioId);
-                onEliminarClick(ejercicioId);
+                onEliminarClick(ejercicioId, this); // Pasar el botón como segundo parámetro
             });
         });
         
@@ -236,7 +239,7 @@ export function renderizarEjercicioView(ejercicio, registros, onEditarRegistroCl
     const ejercicioHTML = `
         <button id="btn-volver-entreno" class="btn-volver">← Volver</button>
         <h2 id="ejercicio-titulo">${ejercicio.nombre}</h2>
-        <img src="${ejercicio.imagenBase64}" alt="${ejercicio.nombre}" class="ejercicio-view-image">
+        <img src="${ejercicio.imagenUrl || ejercicio.imagenBase64}" alt="${ejercicio.nombre}" class="ejercicio-view-image">
         
         <form id="form-nuevo-registro" class="form-registro">
             <h3>Nuevo Registro</h3>
@@ -302,7 +305,7 @@ export function renderizarEjercicioView(ejercicio, registros, onEditarRegistroCl
                 e.stopPropagation();
                 const registroId = parseInt(this.dataset.registroId);
                 if (onEliminarRegistroClick) {
-                    onEliminarRegistroClick(registroId);
+                    onEliminarRegistroClick(registroId, this); // Pasar el botón como segundo parámetro
                 }
             });
         });
@@ -391,7 +394,7 @@ export function renderizarListaRegistros(registros, onEditarRegistroClick, onEli
                 e.stopPropagation();
                 const registroId = parseInt(this.dataset.registroId);
                 if (onEliminarRegistroClick) {
-                    onEliminarRegistroClick(registroId);
+                    onEliminarRegistroClick(registroId, this); // Pasar el botón como segundo parámetro
                 }
             });
         });
@@ -418,11 +421,11 @@ export function renderizarEjercicios(ejercicios, onEditarClick, onEliminarClick,
         const card = document.createElement('div');
         card.className = 'ejercicio-card';
         card.style.cursor = 'pointer';
-        card.draggable = true;
         card.dataset.ejercicioId = ejercicio.id;
         
         card.innerHTML = `
-            <img src="${ejercicio.imagenBase64}" alt="${ejercicio.nombre}" class="ejercicio-card-image">
+            <div class="drag-handle" draggable="true">⠿</div>
+            <img src="${ejercicio.imagenUrl || ejercicio.imagenBase64}" alt="${ejercicio.nombre}" class="ejercicio-card-image">
             <div class="ejercicio-card-content">
                 <h3 class="ejercicio-card-title">${ejercicio.nombre}</h3>
             </div>
@@ -439,8 +442,10 @@ export function renderizarEjercicios(ejercicios, onEditarClick, onEliminarClick,
         // Agregar event listener para hacer clic en la tarjeta (navegar a vista de ejercicio)
         if (onEjercicioClick) {
             card.addEventListener('click', function(e) {
-                // No navegar si se hace clic en los botones o si se está arrastrando
-                if (!e.target.closest('.ejercicio-card-actions') && !card.classList.contains('dragging')) {
+                // No navegar si se hace clic en los botones, el drag handle o si se está arrastrando
+                if (!e.target.closest('.ejercicio-card-actions') && 
+                    !e.target.closest('.drag-handle') && 
+                    !card.classList.contains('dragging')) {
                     onEjercicioClick(ejercicio.id);
                 }
             });
@@ -455,7 +460,7 @@ export function renderizarEjercicios(ejercicios, onEditarClick, onEliminarClick,
         boton.addEventListener('click', function(e) {
             e.stopPropagation();
             const ejercicioId = parseInt(this.dataset.ejercicioId);
-            onEliminarClick(ejercicioId);
+            onEliminarClick(ejercicioId, this); // Pasar el botón como segundo parámetro
         });
     });
     
@@ -510,7 +515,7 @@ export function poblarFormularioEjercicio(ejercicio) {
         inputImagenEjercicio.removeAttribute('required');
         
         // Guardar la imagen Base64 actual en un atributo data del input para referencia
-        inputImagenEjercicio.dataset.currentImage = ejercicio.imagenBase64;
+        inputImagenEjercicio.dataset.currentImage = ejercicio.imagenUrl || ejercicio.imagenBase64;
     }
 }
 

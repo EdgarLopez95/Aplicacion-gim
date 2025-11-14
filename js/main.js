@@ -110,16 +110,22 @@ function configurarDragAndDropEjercicios() {
     
     let draggedElement = null;
     let draggedId = null;
+    let touchStartY = null;
+    let touchOffsetY = null;
+    let initialY = null;
     
-    // Event listener para dragstart
+    // Event listener para dragstart - ahora escucha el drag handle
     listaEjercicios.addEventListener('dragstart', function(e) {
-        // Solo permitir drag en las tarjetas de ejercicio, no en los botones
-        if (e.target.closest('.ejercicio-card')) {
+        // Solo permitir drag en el drag handle
+        if (e.target.classList.contains('drag-handle')) {
+            // Obtener la tarjeta padre que contiene el handle
             draggedElement = e.target.closest('.ejercicio-card');
-            draggedId = parseInt(draggedElement.dataset.ejercicioId);
-            draggedElement.classList.add('dragging');
-            e.dataTransfer.effectAllowed = 'move';
-            e.dataTransfer.setData('text/html', draggedElement.innerHTML);
+            if (draggedElement) {
+                draggedId = parseInt(draggedElement.dataset.ejercicioId);
+                draggedElement.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/html', draggedElement.innerHTML);
+            }
         }
     });
     
@@ -127,6 +133,7 @@ function configurarDragAndDropEjercicios() {
     listaEjercicios.addEventListener('dragend', function(e) {
         if (draggedElement) {
             draggedElement.classList.remove('dragging');
+            draggedElement.style.transform = '';
             draggedElement = null;
             draggedId = null;
         }
@@ -141,18 +148,25 @@ function configurarDragAndDropEjercicios() {
         const afterElement = getDragAfterElement(listaEjercicios, e.clientY);
         const dragging = listaEjercicios.querySelector('.dragging');
         
+        if (!dragging) {
+            return;
+        }
+        
         if (afterElement == null) {
             listaEjercicios.appendChild(dragging);
         } else {
-            listaEjercicios.insertBefore(dragging, afterElement);
+            // CORRECCIÓN: asegurarse de que afterElement es un elemento DOM válido
+            if (afterElement && afterElement.parentNode) {
+                listaEjercicios.insertBefore(dragging, afterElement);
+            }
         }
     });
     
     // Event listener para drop
-    listaEjercicios.addEventListener('drop', function(e) {
+    listaEjercicios.addEventListener('drop', async function(e) {
         e.preventDefault();
         
-        if (!draggedId || !entrenoActual) {
+        if (!draggedId || !entrenoActual || !draggedElement) {
             return;
         }
         
@@ -171,10 +185,10 @@ function configurarDragAndDropEjercicios() {
         
         // Reordenar en storage
         try {
-            reordenarEjercicios(entrenoActual.id, draggedId, targetId);
+            await reordenarEjercicios(entrenoActual.id, draggedId, targetId);
             
             // Re-renderizar la lista de ejercicios
-            const ejercicios = obtenerEjerciciosDeEntreno(entrenoActual.id);
+            const ejercicios = await obtenerEjerciciosDeEntreno(entrenoActual.id);
             renderizarEjercicios(ejercicios, editarEjercicio, eliminarEjercicio, mostrarVistaEjercicio);
             
             // Re-configurar los event listeners (incluyendo drag and drop)
@@ -186,13 +200,144 @@ function configurarDragAndDropEjercicios() {
             alert('Error al reordenar los ejercicios. Por favor, intenta de nuevo.');
         }
     });
+    
+    // ========== SOPORTE TÁCTIL PARA MÓVILES ==========
+    
+    // Event listener para touchstart
+    listaEjercicios.addEventListener('touchstart', function(e) {
+        const handle = e.target.closest('.drag-handle');
+        if (!handle) {
+            return;
+        }
+        
+        e.preventDefault();
+        
+        // Obtener la tarjeta padre que contiene el handle
+        draggedElement = handle.closest('.ejercicio-card');
+        if (draggedElement) {
+            draggedId = parseInt(draggedElement.dataset.ejercicioId);
+            draggedElement.classList.add('dragging');
+            
+            // Guardar posición inicial del touch
+            const touch = e.touches[0];
+            touchStartY = touch.clientY;
+            initialY = draggedElement.getBoundingClientRect().top;
+            touchOffsetY = touch.clientY - initialY;
+        }
+    }, { passive: false });
+    
+    // Event listener para touchmove
+    listaEjercicios.addEventListener('touchmove', function(e) {
+        if (!draggedElement || touchStartY === null) {
+            return;
+        }
+        
+        e.preventDefault();
+        
+        const touch = e.touches[0];
+        const currentY = touch.clientY;
+        const deltaY = currentY - touchStartY;
+        
+        // Mover visualmente la tarjeta
+        draggedElement.style.transform = `translateY(${deltaY}px)`;
+        draggedElement.style.transition = 'none';
+        
+        // Encontrar el elemento sobre el que se está "flotando"
+        const afterElement = getDragAfterElement(listaEjercicios, currentY);
+        const dragging = listaEjercicios.querySelector('.dragging');
+        
+        if (!dragging) {
+            return;
+        }
+        
+        // Reordenar visualmente
+        if (afterElement == null) {
+            if (dragging.nextSibling) {
+                listaEjercicios.appendChild(dragging);
+            }
+        } else {
+            if (afterElement && afterElement.parentNode && afterElement !== dragging) {
+                listaEjercicios.insertBefore(dragging, afterElement);
+            }
+        }
+    }, { passive: false });
+    
+    // Event listener para touchend
+    listaEjercicios.addEventListener('touchend', async function(e) {
+        if (!draggedElement || !draggedId || touchStartY === null) {
+            return;
+        }
+        
+        e.preventDefault();
+        
+        // Quitar el transform
+        draggedElement.style.transform = '';
+        draggedElement.style.transition = '';
+        
+        // Encontrar el elemento sobre el que se soltó
+        const touch = e.changedTouches[0];
+        const elementBelow = document.elementFromPoint(touch.clientX, touch.clientY);
+        const targetCard = elementBelow?.closest('.ejercicio-card');
+        
+        if (!targetCard || !entrenoActual) {
+            // Resetear estado
+            draggedElement.classList.remove('dragging');
+            draggedElement = null;
+            draggedId = null;
+            touchStartY = null;
+            touchOffsetY = null;
+            initialY = null;
+            return;
+        }
+        
+        const targetId = parseInt(targetCard.dataset.ejercicioId);
+        
+        // Si es el mismo elemento, no hacer nada
+        if (targetId === draggedId) {
+            draggedElement.classList.remove('dragging');
+            draggedElement = null;
+            draggedId = null;
+            touchStartY = null;
+            touchOffsetY = null;
+            initialY = null;
+            return;
+        }
+        
+        // Reordenar en storage
+        try {
+            await reordenarEjercicios(entrenoActual.id, draggedId, targetId);
+            
+            // Re-renderizar la lista de ejercicios
+            const ejercicios = await obtenerEjerciciosDeEntreno(entrenoActual.id);
+            renderizarEjercicios(ejercicios, editarEjercicio, eliminarEjercicio, mostrarVistaEjercicio);
+            
+            // Re-configurar los event listeners (incluyendo drag and drop)
+            configurarDragAndDropEjercicios();
+            
+            console.log('Ejercicios reordenados (táctil)');
+        } catch (error) {
+            console.error('Error al reordenar ejercicios:', error);
+            alert('Error al reordenar los ejercicios. Por favor, intenta de nuevo.');
+        } finally {
+            // Resetear estado
+            draggedElement = null;
+            draggedId = null;
+            touchStartY = null;
+            touchOffsetY = null;
+            initialY = null;
+        }
+    }, { passive: false });
 }
 
 // Función auxiliar para encontrar el elemento después del cual insertar
 function getDragAfterElement(container, y) {
     const draggableElements = [...container.querySelectorAll('.ejercicio-card:not(.dragging)')];
     
-    return draggableElements.reduce((closest, child) => {
+    if (draggableElements.length === 0) {
+        return null;
+    }
+    
+    const result = draggableElements.reduce((closest, child) => {
         const box = child.getBoundingClientRect();
         const offset = y - box.top - box.height / 2;
         
@@ -201,28 +346,76 @@ function getDragAfterElement(container, y) {
         } else {
             return closest;
         }
-    }, { offset: Number.NEGATIVE_INFINITY }).element;
+    }, { offset: Number.NEGATIVE_INFINITY });
+    
+    return result.element || null;
 }
 
 // Función para manejar el submit del formulario
 async function manejarSubmitFormulario(e) {
     e.preventDefault();
     
-    const { nombre, archivoImagen } = obtenerValoresFormulario();
+    const form = e.target;
+    const boton = form.querySelector('button[type="submit"]');
     
-    // Validación: nombre es obligatorio
+    // Validación: nombre es obligatorio (antes de mostrar spinner)
+    const { nombre, archivoImagen } = obtenerValoresFormulario();
     if (!nombre) {
         alert('Por favor, ingresa el nombre del ejercicio');
         return;
     }
     
-    let imagenBase64 = null;
+    // 1. Mostrar estado de carga
+    if (boton) {
+        boton.classList.add('is-loading');
+    }
     
-    // Verificar si estamos editando o creando
-    if (currentlyEditingId !== null) {
-        // ESTAMOS EDITANDO
-        if (archivoImagen) {
-            // Hay una nueva imagen, convertirla a Base64
+    try {
+        let imagenBase64 = null;
+        
+        // Verificar si estamos editando o creando
+        if (currentlyEditingId !== null) {
+            // ESTAMOS EDITANDO
+            if (archivoImagen) {
+                // Hay una nueva imagen, convertirla a Base64
+                try {
+                    imagenBase64 = await convertirImagenABase64(archivoImagen);
+                } catch (error) {
+                    console.error('Error al procesar la imagen:', error);
+                    alert(error.message || 'Error al procesar la imagen. Por favor, intenta de nuevo.');
+                    return;
+                }
+            } else {
+                // No hay nueva imagen, conservar la imagen anterior
+                const ejercicios = await obtenerEjerciciosDeEntreno(entrenoActual.id);
+                const ejercicioExistente = ejercicios.find(e => e.id === currentlyEditingId);
+                if (ejercicioExistente) {
+                    imagenBase64 = ejercicioExistente.imagenBase64 || ejercicioExistente.imagenUrl;
+                } else {
+                    alert('Error: No se encontró el ejercicio a editar');
+                    return;
+                }
+            }
+            
+            // Actualizar ejercicio existente
+            const ejercicioActualizado = {
+                id: currentlyEditingId,
+                nombre: nombre,
+                imagenBase64: imagenBase64
+            };
+            
+            // 2. GUARDAR LOS DATOS
+            await actualizarEjercicioEnEntreno(entrenoActual.id, ejercicioActualizado);
+            console.log('Ejercicio actualizado:', ejercicioActualizado);
+            
+        } else {
+            // ESTAMOS CREANDO UN NUEVO EJERCICIO
+            if (!archivoImagen) {
+                alert('Por favor, selecciona una imagen');
+                return;
+            }
+            
+            // Procesar imagen (ahora devuelve el archivo directamente para subirlo a Storage)
             try {
                 imagenBase64 = await convertirImagenABase64(archivoImagen);
             } catch (error) {
@@ -230,84 +423,47 @@ async function manejarSubmitFormulario(e) {
                 alert(error.message || 'Error al procesar la imagen. Por favor, intenta de nuevo.');
                 return;
             }
-        } else {
-            // No hay nueva imagen, conservar la imagen anterior
-            const ejercicios = obtenerEjerciciosDeEntreno(entrenoActual.id);
-            const ejercicioExistente = ejercicios.find(e => e.id === currentlyEditingId);
-            if (ejercicioExistente) {
-                imagenBase64 = ejercicioExistente.imagenBase64;
-            } else {
-                alert('Error: No se encontró el ejercicio a editar');
-                return;
-            }
-        }
-        
-        // Actualizar ejercicio existente
-        const ejercicioActualizado = {
-            id: currentlyEditingId,
-            nombre: nombre,
-            imagenBase64: imagenBase64
-        };
-        
-        // 1. GUARDAR LOS DATOS
-        try {
-            actualizarEjercicioEnEntreno(entrenoActual.id, ejercicioActualizado);
-            console.log('Ejercicio actualizado:', ejercicioActualizado);
-        } catch (error) {
-            alert(error.message || 'Error al guardar el ejercicio. Por favor, intenta de nuevo.');
-            return;
-        }
-        
-    } else {
-        // ESTAMOS CREANDO UN NUEVO EJERCICIO
-        if (!archivoImagen) {
-            alert('Por favor, selecciona una imagen');
-            return;
-        }
-        
-        // Convertir imagen a Base64
-        try {
-            imagenBase64 = await convertirImagenABase64(archivoImagen);
-        } catch (error) {
-            console.error('Error al procesar la imagen:', error);
-            alert(error.message || 'Error al procesar la imagen. Por favor, intenta de nuevo.');
-            return;
-        }
-        
-        // Crear nuevo ejercicio
-        const nuevoEjercicio = {
-            id: Date.now(), // ID único basado en timestamp
-            nombre: nombre,
-            imagenBase64: imagenBase64
-        };
-        
-        // 1. GUARDAR LOS DATOS
-        try {
-            agregarEjercicioAEntreno(entrenoActual.id, nuevoEjercicio);
+            
+            // Crear nuevo ejercicio
+            const nuevoEjercicio = {
+                id: Date.now(), // ID único basado en timestamp
+                nombre: nombre,
+                imagenBase64: imagenBase64 // Ahora es el archivo File
+            };
+            
+            // 2. GUARDAR LOS DATOS
+            await agregarEjercicioAEntreno(entrenoActual.id, nuevoEjercicio);
             console.log('Ejercicio agregado:', nuevoEjercicio);
-        } catch (error) {
-            alert(error.message || 'Error al guardar el ejercicio. Por favor, intenta de nuevo.');
-            return;
+        }
+        
+        // 3. RENDERIZAR LOS EJERCICIOS (LO MÁS IMPORTANTE)
+        const ejercicios = await obtenerEjerciciosDeEntreno(entrenoActual.id);
+        renderizarEjercicios(ejercicios, editarEjercicio, eliminarEjercicio, mostrarVistaEjercicio);
+        
+        // Resetear el ID de edición
+        currentlyEditingId = null;
+        
+        // 4. CERRAR EL MODAL
+        ocultarModal();
+        
+    } catch (error) {
+        // 3. Manejar el error
+        console.error('Error al guardar:', error);
+        alert(error.message || 'Error al guardar el ejercicio. Por favor, intenta de nuevo.');
+    } finally {
+        // 4. Quitar estado de carga (SIEMPRE se ejecuta)
+        if (boton) {
+            boton.classList.remove('is-loading');
         }
     }
-    
-    // 2. RENDERIZAR LOS EJERCICIOS (LO MÁS IMPORTANTE)
-    const ejercicios = obtenerEjerciciosDeEntreno(entrenoActual.id);
-    renderizarEjercicios(ejercicios, editarEjercicio, eliminarEjercicio, mostrarVistaEjercicio);
-    
-    // Resetear el ID de edición
-    currentlyEditingId = null;
-    
-    // 3. CERRAR EL MODAL
-    ocultarModal();
 }
 
 // Función para mostrar la vista de entreno con los datos del entreno seleccionado
-function mostrarVistaEntreno(entreno) {
+async function mostrarVistaEntreno(entreno) {
     entrenoActual = entreno;
     
     // 1. Renderizar la vista completa
-    const ejercicios = obtenerEjerciciosDeEntreno(entrenoActual.id);
+    const ejercicios = await obtenerEjerciciosDeEntreno(entrenoActual.id);
     renderizarEntrenoView(entreno, ejercicios, editarEjercicio, eliminarEjercicio, mostrarVistaEjercicio);
     
     // 2. Mostrar la vista
@@ -318,14 +474,14 @@ function mostrarVistaEntreno(entreno) {
 }
 
 // Función para mostrar la vista de ejercicio (registro de progreso)
-function mostrarVistaEjercicio(ejercicioId) {
+async function mostrarVistaEjercicio(ejercicioId) {
     if (!entrenoActual) {
         console.error('No hay entreno actual');
         return;
     }
     
     // Obtener el ejercicio
-    const ejercicio = obtenerEjercicio(entrenoActual.id, ejercicioId);
+    const ejercicio = await obtenerEjercicio(entrenoActual.id, ejercicioId);
     if (!ejercicio) {
         console.error('Ejercicio no encontrado');
         return;
@@ -369,7 +525,7 @@ function configurarEventListenersEjercicioView() {
 }
 
 // Función para manejar el submit del formulario de registro
-function manejarSubmitRegistro(e) {
+async function manejarSubmitRegistro(e) {
     e.preventDefault();
     
     if (!entrenoActual || !ejercicioActual) {
@@ -378,6 +534,7 @@ function manejarSubmitRegistro(e) {
     }
     
     const form = e.target;
+    const boton = form.querySelector('button[type="submit"]');
     const fecha = form.querySelector('#fecha-registro').value;
     const notas = form.querySelector('#notas-registro').value.trim();
     
@@ -398,26 +555,32 @@ function manejarSubmitRegistro(e) {
         return;
     }
     
-    // Crear objeto de registro
-    const datosRegistro = {
-        fecha: fecha,
-        series: series,
-        notas: notas || ''
-    };
+    // 1. Mostrar estado de carga
+    if (boton) {
+        boton.classList.add('is-loading');
+    }
     
     try {
+        // Crear objeto de registro
+        const datosRegistro = {
+            fecha: fecha,
+            series: series,
+            notas: notas || ''
+        };
+        
+        // 2. Hacer el trabajo
         if (currentlyEditingRegistroId !== null) {
             // ESTAMOS EDITANDO
-            actualizarRegistroEnEjercicio(entrenoActual.id, ejercicioActual.id, currentlyEditingRegistroId, datosRegistro);
+            await actualizarRegistroEnEjercicio(entrenoActual.id, ejercicioActual.id, currentlyEditingRegistroId, datosRegistro);
             console.log('Registro actualizado:', datosRegistro);
         } else {
             // ESTAMOS CREANDO UN NUEVO REGISTRO
-            agregarRegistroAEjercicio(entrenoActual.id, ejercicioActual.id, datosRegistro);
+            await agregarRegistroAEjercicio(entrenoActual.id, ejercicioActual.id, datosRegistro);
             console.log('Registro guardado:', datosRegistro);
         }
         
         // Actualizar el ejercicio actual con los nuevos registros
-        ejercicioActual = obtenerEjercicio(entrenoActual.id, ejercicioActual.id);
+        ejercicioActual = await obtenerEjercicio(entrenoActual.id, ejercicioActual.id);
         const registros = ejercicioActual.registros || [];
         
         // Actualizar la lista de registros
@@ -433,14 +596,19 @@ function manejarSubmitRegistro(e) {
         currentlyEditingRegistroId = null;
         
         // Cambiar el texto del botón de vuelta a "Guardar Registro"
-        const btnSubmit = form.querySelector('button[type="submit"]');
-        if (btnSubmit) {
-            btnSubmit.textContent = 'Guardar Registro';
+        if (boton) {
+            boton.textContent = 'Guardar Registro';
         }
         
     } catch (error) {
+        // 3. Manejar el error
         console.error('Error al guardar el registro:', error);
         alert('Error al guardar el registro. Por favor, intenta de nuevo.');
+    } finally {
+        // 4. Quitar estado de carga (SIEMPRE se ejecuta)
+        if (boton) {
+            boton.classList.remove('is-loading');
+        }
     }
 }
 
@@ -514,62 +682,101 @@ function editarRegistro(registroId) {
 }
 
 // Función para eliminar un registro
-function eliminarRegistro(registroId) {
+async function eliminarRegistro(registroId, botonElement) {
     if (!entrenoActual || !ejercicioActual) {
         console.error('No hay entreno o ejercicio actual');
         return;
     }
     
-    if (confirm('¿Estás seguro de que quieres eliminar este registro?')) {
-        try {
-            eliminarRegistroDeEjercicio(entrenoActual.id, ejercicioActual.id, registroId);
+    if (!confirm('¿Estás seguro de que quieres eliminar este registro?')) {
+        return;
+    }
+    
+    // Usar el botón pasado como parámetro, o intentar encontrarlo como fallback
+    const boton = botonElement || document.querySelector(`.btn-eliminar-registro[data-registro-id="${registroId}"]`);
+    
+    // 1. Mostrar estado de carga
+    if (boton) {
+        boton.classList.add('is-loading');
+    }
+    
+    try {
+        // 2. Hacer el trabajo
+        await eliminarRegistroDeEjercicio(entrenoActual.id, ejercicioActual.id, registroId);
+        
+        // Si estábamos editando este registro, resetear el ID de edición
+        if (currentlyEditingRegistroId === registroId) {
+            currentlyEditingRegistroId = null;
             
-            // Si estábamos editando este registro, resetear el ID de edición
-            if (currentlyEditingRegistroId === registroId) {
-                currentlyEditingRegistroId = null;
+            // Limpiar el formulario
+            const form = document.getElementById('form-nuevo-registro');
+            if (form) {
+                form.reset();
+                form.querySelector('#fecha-registro').value = new Date().toISOString().split('T')[0];
                 
-                // Limpiar el formulario
-                const form = document.getElementById('form-nuevo-registro');
-                if (form) {
-                    form.reset();
-                    form.querySelector('#fecha-registro').value = new Date().toISOString().split('T')[0];
-                    
-                    // Cambiar el texto del botón de vuelta a "Guardar Registro"
-                    const btnSubmit = form.querySelector('button[type="submit"]');
-                    if (btnSubmit) {
-                        btnSubmit.textContent = 'Guardar Registro';
-                    }
+                // Cambiar el texto del botón de vuelta a "Guardar Registro"
+                const btnSubmit = form.querySelector('button[type="submit"]');
+                if (btnSubmit) {
+                    btnSubmit.textContent = 'Guardar Registro';
                 }
             }
-            
-            // Actualizar el ejercicio actual
-            ejercicioActual = obtenerEjercicio(entrenoActual.id, ejercicioActual.id);
-            const registros = ejercicioActual.registros || [];
-            
-            // Actualizar la lista de registros
-            renderizarListaRegistros(registros, editarRegistro, eliminarRegistro);
-            
-            console.log('Registro eliminado:', registroId);
-        } catch (error) {
-            console.error('Error al eliminar el registro:', error);
-            alert('Error al eliminar el registro. Por favor, intenta de nuevo.');
+        }
+        
+        // Actualizar el ejercicio actual
+        ejercicioActual = await obtenerEjercicio(entrenoActual.id, ejercicioActual.id);
+        const registros = ejercicioActual.registros || [];
+        
+        // Actualizar la lista de registros
+        renderizarListaRegistros(registros, editarRegistro, eliminarRegistro);
+        
+        console.log('Registro eliminado:', registroId);
+    } catch (error) {
+        // 3. Manejar el error
+        console.error('Error al eliminar el registro:', error);
+        alert('Error al eliminar el registro. Por favor, intenta de nuevo.');
+    } finally {
+        // 4. Quitar estado de carga (SIEMPRE se ejecuta)
+        if (boton) {
+            boton.classList.remove('is-loading');
         }
     }
 }
 
 // Función para eliminar un ejercicio
-function eliminarEjercicio(ejercicioId) {
-    if (confirm('¿Estás seguro de que quieres eliminar este ejercicio?')) {
-        eliminarEjercicioDeEntreno(entrenoActual.id, ejercicioId);
-        const ejercicios = obtenerEjerciciosDeEntreno(entrenoActual.id);
+async function eliminarEjercicio(ejercicioId, botonElement) {
+    if (!confirm('¿Estás seguro de que quieres eliminar este ejercicio?')) {
+        return;
+    }
+    
+    // Usar el botón pasado como parámetro, o intentar encontrarlo como fallback
+    const boton = botonElement || document.querySelector(`.btn-eliminar[data-ejercicio-id="${ejercicioId}"]`);
+    
+    // 1. Mostrar estado de carga
+    if (boton) {
+        boton.classList.add('is-loading');
+    }
+    
+    try {
+        // 2. Hacer el trabajo
+        await eliminarEjercicioDeEntreno(entrenoActual.id, ejercicioId);
+        const ejercicios = await obtenerEjerciciosDeEntreno(entrenoActual.id);
         renderizarEjercicios(ejercicios, editarEjercicio, eliminarEjercicio, mostrarVistaEjercicio);
         console.log('Ejercicio eliminado:', ejercicioId);
+    } catch (error) {
+        // 3. Manejar el error
+        console.error('Error al eliminar el ejercicio:', error);
+        alert('Error al eliminar el ejercicio. Por favor, intenta de nuevo.');
+    } finally {
+        // 4. Quitar estado de carga (SIEMPRE se ejecuta)
+        if (boton) {
+            boton.classList.remove('is-loading');
+        }
     }
 }
 
 // Función para editar un ejercicio
-function editarEjercicio(ejercicioId) {
-    const ejercicios = obtenerEjerciciosDeEntreno(entrenoActual.id);
+async function editarEjercicio(ejercicioId) {
+    const ejercicios = await obtenerEjerciciosDeEntreno(entrenoActual.id);
     const ejercicio = ejercicios.find(e => e.id === ejercicioId);
     
     if (!ejercicio) {
@@ -591,21 +798,37 @@ function editarEjercicio(ejercicioId) {
 }
 
 // Función para inicializar la aplicación
-function initApp() {
-    // Inicializar datos en LocalStorage (si no existen)
-    const entrenos = inicializarDatos();
-    
-    // Renderizar la vista completa del dashboard
-    renderizarDashboardView(entrenos, mostrarVistaEntreno);
-    
-    // Asegurar que solo el dashboard esté visible al cargar
-    showView(getDashboardView());
-    
-    // NOTA: Los event listeners de la vista de entreno (botones, modal, formulario)
-    // se configuran en configurarEventListenersEntrenoView(), que se llama
-    // después de renderizar la vista de entreno en mostrarVistaEntreno()
-    
-    console.log('Aplicación inicializada correctamente');
+async function initApp() {
+    try {
+        // Inicializar datos en Firestore (si no existen)
+        const entrenos = await inicializarDatos();
+        
+        // Renderizar la vista completa del dashboard
+        renderizarDashboardView(entrenos, mostrarVistaEntreno);
+        
+        // Asegurar que solo el dashboard esté visible al cargar
+        showView(getDashboardView());
+        
+        // NOTA: Los event listeners de la vista de entreno (botones, modal, formulario)
+        // se configuran en configurarEventListenersEntrenoView(), que se llama
+        // después de renderizar la vista de entreno en mostrarVistaEntreno()
+        
+        console.log('Aplicación inicializada correctamente');
+        
+        // Registrar el Service Worker
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js')
+                .then(registration => {
+                    console.log('Service Worker registrado con éxito:', registration);
+                })
+                .catch(error => {
+                    console.error('Error al registrar el Service Worker:', error);
+                });
+        }
+    } catch (error) {
+        console.error('Error al inicializar la aplicación:', error);
+        alert('Error al cargar la aplicación. Por favor, recarga la página.');
+    }
 }
 
 // Inicializar la aplicación cuando el DOM esté listo
