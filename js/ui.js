@@ -1,5 +1,83 @@
 // ui.js - Lógica de manipulación del DOM
 
+// Configuración de métricas corporales
+const METRICAS_CONFIG = {
+    peso: { label: 'PESO', unit: 'kg' }, // El peso depende de la altura, difícil dar rango fijo aquí
+    imc: { 
+        label: 'I.M.C', 
+        unit: '', 
+        ranges: [
+            {max: 18.5, label: 'Bajo', color: 'var(--accent-color)'}, 
+            {max: 24.9, label: 'Normal', color: '#28a745'}, 
+            {max: 999, label: 'Alto', color: '#dc3545'}
+        ] 
+    },
+    grasa: { 
+        label: 'GRASA CORPORAL', 
+        unit: '%', 
+        ranges: [
+            {max: 10, label: 'Bajo', color: 'var(--accent-color)'}, 
+            {max: 20, label: 'Normal', color: '#28a745'}, 
+            {max: 999, label: 'Alto', color: '#dc3545'}
+        ] 
+    },
+    musculo: { 
+        label: 'MASA MUSCULAR', 
+        unit: '%', 
+        ranges: [
+            {max: 33, label: 'Bajo', color: 'var(--accent-color)'}, 
+            {max: 999, label: 'Alto/Bueno', color: '#28a745'}
+        ] 
+    },
+    hueso: { 
+        label: 'MASA ÓSEA', 
+        unit: 'kg', 
+        ranges: [
+            {max: 2.5, label: 'Bajo', color: 'var(--accent-color)'}, 
+            {max: 3.5, label: 'Normal', color: '#28a745'}, 
+            {max: 999, label: 'Alto', color: '#dc3545'}
+        ] 
+    },
+    agua: { 
+        label: 'AGUA', 
+        unit: '%', 
+        ranges: [
+            {max: 50, label: 'Bajo', color: 'var(--accent-color)'}, 
+            {max: 65, label: 'Normal', color: '#28a745'}, 
+            {max: 999, label: 'Alto', color: '#dc3545'}
+        ] 
+    },
+    metabolismo: { label: 'METABOLISMO BASAL', unit: 'kcal' },
+    visceral: { 
+        label: 'GRASA VISCERAL', 
+        unit: '', 
+        ranges: [
+            {max: 9, label: 'Normal', color: '#28a745'}, 
+            {max: 999, label: 'Alto/Peligro', color: '#dc3545'}
+        ] 
+    }
+};
+
+// Función auxiliar para obtener el rango de una métrica
+function obtenerRangoMetrica(metricaKey, valor) {
+    if (!valor || valor === null || valor === undefined) {
+        return null;
+    }
+    
+    const config = METRICAS_CONFIG[metricaKey];
+    if (!config || !config.ranges) {
+        return null;
+    }
+    
+    for (const range of config.ranges) {
+        if (valor <= range.max) {
+            return { label: range.label, color: range.color };
+        }
+    }
+    
+    return null;
+}
+
 // Referencias a elementos del DOM (se actualizarán después de renderizar)
 let dashboardView = null;
 let entrenoView = null;
@@ -134,6 +212,16 @@ export function renderizarEntrenoView(entreno) {
     const entrenoHTML = `
         <h2 id="entreno-titulo">${entreno.nombre}</h2>
         <div id="breadcrumbs" class="breadcrumbs-container"></div>
+        <div class="progress-wrapper">
+            <div class="progress-header">
+                <span class="progress-label">PROGRESO DIARIO</span>
+                <span id="progress-percent" class="progress-percent">0%</span>
+            </div>
+            <div class="progress-track">
+                <div id="progress-fill" class="progress-fill" style="width: 0%;"></div>
+            </div>
+            <p id="progress-text" class="progress-detail">0 de 0 ejercicios</p>
+        </div>
         <div id="lista-ejercicios-container" class="lista-ejercicios">
             <div class="loader-spinner" style="margin: 40px auto;"></div>
         </div>
@@ -223,17 +311,14 @@ export function renderizarListaEjercicios(ejercicios, onEditarClick, onEliminarC
                     </svg>
                 </button>
             </div>
-            ${!ejercicio.isCompletedToday ? '<div class="drag-handle" draggable="true">::</div>' : '<div class="drag-placeholder"></div>'}
         `;
         
         // Agregar event listener para hacer clic en la tarjeta (navegar a vista de ejercicio)
         if (onEjercicioClick) {
             card.addEventListener('click', function(e) {
-                // No navegar si se hace clic en los botones, el drag handle, checkbox o si se está arrastrando
+                // No navegar si se hace clic en los botones o checkbox
                 if (!e.target.closest('.ejercicio-card-actions') && 
-                    !e.target.closest('.drag-handle') && 
-                    !e.target.closest('.checkbox-container') &&
-                    !card.classList.contains('dragging')) {
+                    !e.target.closest('.checkbox-container')) {
                     onEjercicioClick(ejercicio.id);
                 }
             });
@@ -904,7 +989,6 @@ export function renderizarEjercicios(ejercicios, onEditarClick, onEliminarClick,
         card.dataset.ejercicioId = ejercicio.id;
         
         card.innerHTML = `
-            <div class="drag-handle" draggable="true">⠿</div>
             <img src="${ejercicio.imagenUrl || ejercicio.imagenBase64}" alt="${ejercicio.nombre}" class="ejercicio-card-image">
             <div class="ejercicio-card-content">
                 <h3 class="ejercicio-card-title">${ejercicio.nombre}</h3>
@@ -933,10 +1017,8 @@ export function renderizarEjercicios(ejercicios, onEditarClick, onEliminarClick,
         // Agregar event listener para hacer clic en la tarjeta (navegar a vista de ejercicio)
         if (onEjercicioClick) {
             card.addEventListener('click', function(e) {
-                // No navegar si se hace clic en los botones, el drag handle o si se está arrastrando
-                if (!e.target.closest('.ejercicio-card-actions') && 
-                    !e.target.closest('.drag-handle') && 
-                    !card.classList.contains('dragging')) {
+                // No navegar si se hace clic en los botones
+                if (!e.target.closest('.ejercicio-card-actions')) {
                     onEjercicioClick(ejercicio.id);
                 }
             });
@@ -1277,8 +1359,112 @@ export function actualizarBreadcrumbs(links, onNavigate) {
     }
 }
 
+// Función para renderizar la tabla de historial
+function renderizarTablaHistorial(historial) {
+    if (!historial || historial.length === 0) {
+        return `
+            <div class="historial-empty">
+                <p>No hay registros de mediciones aún.</p>
+                <p class="historial-empty-hint">Usa el botón "Registrar Medición" para comenzar.</p>
+            </div>
+        `;
+    }
+    
+    // Ordenar por fecha descendente (más reciente primero)
+    const historialOrdenado = [...historial].sort((a, b) => {
+        const fechaA = new Date(a.fecha).getTime();
+        const fechaB = new Date(b.fecha).getTime();
+        return fechaB - fechaA;
+    });
+    
+    const tarjetas = historialOrdenado.map(medicion => {
+        const fecha = new Date(medicion.fecha);
+        const fechaFormateada = fecha.toLocaleDateString('es-ES', { 
+            day: '2-digit', 
+            month: '2-digit', 
+            year: 'numeric' 
+        });
+        
+        return `
+            <div class="historial-card" data-id="${medicion.id}">
+                <div class="historial-card-header">
+                    <div class="historial-card-fecha">${fechaFormateada}</div>
+                    <div class="historial-card-peso">${medicion.peso ? `${medicion.peso} kg` : 'N/A'}</div>
+                    <div class="historial-card-arrow">▼</div>
+                </div>
+                <div class="historial-card-details">
+                    <div class="historial-detail-item">
+                        <span class="historial-detail-label">Grasa:</span>
+                        <span class="historial-detail-value">${medicion.grasa ? `${medicion.grasa}%` : '<span class="na">N/A</span>'}</span>
+                    </div>
+                    <div class="historial-detail-item">
+                        <span class="historial-detail-label">Músculo:</span>
+                        <span class="historial-detail-value">${medicion.musculo ? `${medicion.musculo}%` : '<span class="na">N/A</span>'}</span>
+                    </div>
+                    <div class="historial-detail-item">
+                        <span class="historial-detail-label">Agua:</span>
+                        <span class="historial-detail-value">${medicion.agua ? `${medicion.agua}%` : '<span class="na">N/A</span>'}</span>
+                    </div>
+                    <div class="historial-detail-item">
+                        <span class="historial-detail-label">Visceral:</span>
+                        <span class="historial-detail-value">${medicion.visceral ? `${medicion.visceral}` : '<span class="na">N/A</span>'}</span>
+                    </div>
+                    <div class="historial-card-actions">
+                        <button class="btn-icon btn-editar-medicion" data-id="${medicion.id}" title="Editar">
+                            ✏️
+                        </button>
+                        <button class="btn-icon btn-eliminar-medicion" data-id="${medicion.id}" title="Eliminar">
+                            🗑️
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+    
+    return `
+        <div class="historial-container">
+            <h3 class="section-title-perfil">HISTORIAL DE REGISTROS</h3>
+            <div class="historial-list">
+                ${tarjetas}
+            </div>
+        </div>
+    `;
+}
+
+// Función auxiliar para renderizar las métricas
+function renderizarMetricas(datosPerfil, ultimaMedicion, imc) {
+    // Definir el orden y las métricas a mostrar
+    const metricasOrden = [
+        { key: 'peso', valor: ultimaMedicion?.peso || datosPerfil.peso },
+        { key: 'imc', valor: imc?.valor },
+        { key: 'grasa', valor: ultimaMedicion?.grasa },
+        { key: 'musculo', valor: ultimaMedicion?.musculo },
+        { key: 'agua', valor: ultimaMedicion?.agua },
+        { key: 'visceral', valor: ultimaMedicion?.visceral }
+    ];
+    
+    return metricasOrden.map(({ key, valor }) => {
+        const config = METRICAS_CONFIG[key];
+        if (!config) return '';
+        
+        const tieneValor = valor !== null && valor !== undefined;
+        const rango = obtenerRangoMetrica(key, valor);
+        const valorFormateado = tieneValor ? valor : null;
+        const unidad = config.unit ? ` ${config.unit}` : '';
+        
+        return `
+            <div class="metric-item">
+                <div class="metric-label">${config.label}</div>
+                <div class="metric-value">${valorFormateado !== null ? `${valorFormateado}${unidad}` : '--'}</div>
+                ${rango ? `<div class="metric-badge" style="color: ${rango.color};">${rango.label}</div>` : ''}
+            </div>
+        `;
+    }).join('');
+}
+
 // Función para renderizar la vista de perfil
-export function renderizarPerfilView() {
+export function renderizarPerfilView(datosPerfil = {}) {
     actualizarReferenciasDOM();
     
     const perfilView = document.getElementById('perfil-view');
@@ -1287,14 +1473,141 @@ export function renderizarPerfilView() {
         return;
     }
     
+    const nombre = datosPerfil.nombre || 'Usuario';
+    const peso = datosPerfil.peso || null;
+    const altura = datosPerfil.altura || null;
+    const edad = datosPerfil.edad || null;
+    const imc = datosPerfil.imc || { valor: null, categoria: 'No disponible' };
+    const ultimaMedicion = datosPerfil.ultimaMedicion || null;
+    
+    // URL de la foto de perfil (usando la del header)
+    const fotoPerfil = 'https://firebasestorage.googleapis.com/v0/b/aplicacion-gim-d3e48.firebasestorage.app/o/foto-perfil.jpg?alt=media&token=fca49d32-9df9-4563-88ad-30f3036c222f';
+    
     const perfilHTML = `
-        <h1>MI PERFIL</h1>
-        <div style="padding: 20px; text-align: center; color: var(--text-secondary);">
-            <p>Próximamente: Datos corporales y estadísticas</p>
+        <div class="perfil-header">
+            <img src="${fotoPerfil}" alt="${nombre}" class="perfil-foto" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27120%27 height=%27120%27%3E%3Ccircle cx=%2760%27 cy=%2760%27 r=%2760%27 fill=%27%231C1C1E%27/%3E%3Ctext x=%2760%27 y=%2770%27 text-anchor=%27middle%27 fill=%27white%27 font-size=%2740%27%3E${nombre.charAt(0).toUpperCase()}%3C/text%3E%3C/svg%3E'">
+            <h2 class="perfil-nombre">${nombre}</h2>
+        </div>
+        
+        <div class="perfil-stats-grid" data-nombre="${nombre}" data-peso="${peso || ''}" data-altura="${altura || ''}" data-edad="${edad || ''}">
+            <div class="stat-card">
+                <div class="stat-label">PESO</div>
+                <div class="stat-value">${peso ? `${peso} kg` : '--'}</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">ALTURA</div>
+                <div class="stat-value">${altura ? `${altura} cm` : '--'}</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">EDAD</div>
+                <div class="stat-value">${edad ? `${edad} años` : '--'}</div>
+            </div>
+            <div class="stat-card stat-card-imc">
+                <div class="stat-label">IMC</div>
+                <div class="stat-value">${imc.valor ? imc.valor : '--'}</div>
+                <div class="stat-categoria">${imc.categoria}</div>
+            </div>
+        </div>
+        
+        <div class="perfil-resumen-section">
+            <h3 class="section-title-perfil">RESUMEN ACTUAL</h3>
+            <div class="perfil-metricas-list">
+                ${renderizarMetricas(datosPerfil, ultimaMedicion, imc)}
+            </div>
+        </div>
+        
+        <div class="chart-wrapper">
+            <div class="chart-controls">
+                <button class="chart-filter-btn active" data-filter="peso">Peso</button>
+                <button class="chart-filter-btn" data-filter="grasa">Grasa</button>
+                <button class="chart-filter-btn" data-filter="musculo">Músculo</button>
+            </div>
+            <div class="chart-container">
+                <canvas id="progressChart"></canvas>
+            </div>
+        </div>
+        
+        ${renderizarTablaHistorial(datosPerfil.historial || [])}
+        
+        <button id="btn-borrar-historial" class="btn btn-borrar-historial">Borrar Historial (Dev)</button>
+        
+        <button id="btn-editar-perfil" class="btn btn-editar-perfil">Editar Perfil</button>
+        <button id="btn-registrar-medicion" class="btn btn-registrar-medicion">Registrar Medición</button>
+        
+        <!-- Modal de edición de perfil -->
+        <div id="modal-perfil" class="modal" style="display: none;">
+            <div class="modal-content">
+                <h3>Editar Perfil</h3>
+                <form id="form-perfil">
+                    <div class="form-group">
+                        <label for="nombre-perfil">Nombre</label>
+                        <input type="text" id="nombre-perfil" name="nombre" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="peso-perfil">Peso (kg)</label>
+                        <input type="number" id="peso-perfil" name="peso" min="1" max="500" step="0.1">
+                    </div>
+                    <div class="form-group">
+                        <label for="altura-perfil">Altura (cm)</label>
+                        <input type="number" id="altura-perfil" name="altura" min="1" max="300" step="1">
+                    </div>
+                    <div class="form-group">
+                        <label for="edad-perfil">Edad</label>
+                        <input type="number" id="edad-perfil" name="edad" min="1" max="150" step="1">
+                    </div>
+                    <div class="modal-buttons">
+                        <button type="button" id="btn-cancelar-perfil" class="btn btn-secondary">Cancelar</button>
+                        <button type="submit" class="btn">Guardar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Modal de registro de medición -->
+        <div id="modal-medicion" class="modal" style="display: none;">
+            <div class="modal-content">
+                <h3>Registrar Medición</h3>
+                <form id="form-medicion">
+                    <div class="form-group">
+                        <label for="fecha-medicion">Fecha</label>
+                        <input type="date" id="fecha-medicion" name="fecha" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="peso-medicion">Peso (kg)</label>
+                        <input type="number" id="peso-medicion" name="peso" min="1" max="500" step="0.1" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="grasa-medicion">Grasa (%)</label>
+                        <input type="number" id="grasa-medicion" name="grasa" min="0" max="100" step="0.1">
+                    </div>
+                    <div class="form-group">
+                        <label for="musculo-medicion">Músculo (%)</label>
+                        <input type="number" id="musculo-medicion" name="musculo" min="0" max="100" step="0.1">
+                    </div>
+                    <div class="form-group">
+                        <label for="agua-medicion">Agua (%)</label>
+                        <input type="number" id="agua-medicion" name="agua" min="0" max="100" step="0.1">
+                    </div>
+                    <div class="form-group">
+                        <label for="visceral-medicion">Visceral (Nivel)</label>
+                        <input type="number" id="visceral-medicion" name="visceral" min="0" max="50" step="0.1">
+                    </div>
+                    <div class="modal-buttons">
+                        <button type="button" id="btn-cancelar-medicion" class="btn btn-secondary">Cancelar</button>
+                        <button type="submit" class="btn">Guardar</button>
+                    </div>
+                </form>
+            </div>
         </div>
     `;
     
     perfilView.innerHTML = perfilHTML;
+    
+    // Guardar datos en un elemento oculto para el modal
+    const statsGrid = perfilView.querySelector('.perfil-stats-grid');
+    if (statsGrid) {
+        statsGrid.classList.add('perfil-data');
+    }
 }
 
 // Función para renderizar el modal de selección de ejercicios

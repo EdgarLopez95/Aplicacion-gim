@@ -49,13 +49,6 @@
     background-color: #1a1a1a;
 }
 
-/* Placeholder para drag handle en ejercicios completados */
-.drag-placeholder {
-    grid-column: 1 / -1;
-    grid-row: 2;
-    height: 20px;
-    /* Mantiene el espacio visual pero sin funcionalidad de arrastre */
-}
 
 /* Breadcrumbs */
 .breadcrumbs-container {
@@ -64,6 +57,59 @@
     gap: 8px;
     margin-bottom: 16px;
     flex-wrap: wrap;
+}
+
+/* Barra de Progreso */
+.progress-wrapper {
+    padding: 20px 16px;
+    background-color: var(--bg-primary);
+    position: sticky;
+    top: 60px;
+    z-index: 9;
+    border-bottom: 1px solid var(--bg-secondary);
+}
+
+.progress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.progress-label {
+    color: var(--text-primary);
+    font-size: 14px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.progress-percent {
+    color: var(--accent-color);
+    font-weight: 700;
+    font-size: 18px;
+}
+
+.progress-track {
+    height: 10px;
+    background-color: var(--bg-secondary);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+
+.progress-fill {
+    height: 100%;
+    background-color: var(--accent-color);
+    transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 10px;
+}
+
+.progress-detail {
+    color: #888;
+    font-size: 12px;
+    text-align: right;
+    margin: 0;
 }
 
 .breadcrumbs-container .breadcrumb-item {
@@ -101,7 +147,7 @@
     flex: 1;
     width: 100%;
     margin-bottom: 16px;
-    padding-bottom: 80px; /* Espacio para el botón fixed */
+    padding-bottom: 200px; /* Espacio para el botón fixed */
 }
 
 /* Responsive - Tablet y Desktop */
@@ -132,7 +178,7 @@
 /* Ejercicio View - Mobile First */
 #ejercicio-view {
     gap: 16px;
-    padding-bottom: 100px; /* Espacio para el botón fixed */
+    padding-bottom: 200px; /* Espacio para el botón fixed */
 }
 
 #ejercicio-titulo {
@@ -499,6 +545,476 @@
     .registros-table th,
     .registros-table td {
         padding: 16px;
+    }
+}
+
+/* Perfil View - Mobile First */
+.perfil-header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 32px 16px;
+    text-align: center;
+}
+
+.perfil-foto {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 4px solid var(--accent-color);
+    margin-bottom: 16px;
+}
+
+.perfil-nombre {
+    color: var(--text-primary);
+    font-size: 24px;
+    font-family: var(--font-title-main);
+    font-weight: 400;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin: 0;
+}
+
+.perfil-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+    padding: 0 16px 24px 16px;
+}
+
+.stat-card {
+    background-color: var(--bg-card);
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.stat-card-imc {
+    background: linear-gradient(135deg, var(--accent-color) 0%, var(--accent-hover) 100%);
+    color: var(--text-tertiary);
+}
+
+.stat-label {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+    opacity: 0.8;
+}
+
+.stat-card-imc .stat-label {
+    color: var(--text-tertiary);
+    opacity: 0.9;
+}
+
+.stat-value {
+    font-size: 24px;
+    font-weight: 700;
+    font-family: var(--font-title-secondary);
+    color: var(--text-primary);
+}
+
+.stat-card-imc .stat-value {
+    color: var(--text-tertiary);
+}
+
+.stat-categoria {
+    font-size: 11px;
+    font-weight: 500;
+    margin-top: 4px;
+    opacity: 0.9;
+    color: var(--text-tertiary);
+}
+
+.btn-editar-perfil,
+.btn-registrar-medicion,
+.btn-borrar-historial {
+    width: 100%;
+    max-width: 400px;
+    margin: 8px auto;
+    display: block;
+}
+
+.btn-registrar-medicion {
+    background-color: var(--accent-color);
+    color: var(--text-tertiary);
+}
+
+.btn-registrar-medicion:hover {
+    background-color: var(--accent-hover);
+}
+
+.perfil-resumen-section {
+    padding: 0 16px 24px 16px;
+}
+
+.section-title-perfil {
+    color: var(--text-primary);
+    font-size: 18px;
+    font-family: var(--font-title-main);
+    font-weight: 400;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin: 0 0 16px 0;
+}
+
+.perfil-metricas-list {
+    background-color: var(--bg-card);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.metric-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    transition: background-color 0.2s ease;
+}
+
+.metric-item:last-child {
+    border-bottom: none;
+}
+
+.metric-item:hover {
+    background-color: rgba(255, 255, 255, 0.02);
+}
+
+.metric-label {
+    font-size: 14px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-secondary);
+    flex: 1;
+}
+
+.metric-value {
+    font-size: 20px;
+    font-weight: 700;
+    font-family: var(--font-title-secondary);
+    color: var(--text-primary);
+    margin-right: 12px;
+    text-align: right;
+    min-width: 80px;
+}
+
+.metric-badge {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    background-color: rgba(255, 255, 255, 0.1);
+    min-width: 60px;
+    text-align: center;
+}
+
+.chart-wrapper {
+    margin: 0 16px 24px 16px;
+}
+
+.chart-controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+    justify-content: center;
+}
+
+.chart-filter-btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 20px;
+    background-color: var(--bg-secondary);
+    color: var(--text-secondary);
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.chart-filter-btn:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.chart-filter-btn.active {
+    background-color: #00ff88;
+    color: #000;
+    box-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+}
+
+.chart-container {
+    position: relative;
+    height: 300px;
+    background-color: var(--bg-card);
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.btn-borrar-historial {
+    background-color: #dc3545;
+    color: #fff;
+    font-size: 12px;
+    padding: 8px 16px;
+}
+
+.btn-borrar-historial:hover {
+    background-color: #c82333;
+}
+
+/* Responsive - Tablet y Desktop */
+@media (min-width: 768px) {
+    .perfil-foto {
+        width: 150px;
+        height: 150px;
+    }
+    
+    .perfil-nombre {
+        font-size: 32px;
+    }
+    
+    .perfil-stats-grid {
+        grid-template-columns: repeat(4, 1fr);
+        gap: 20px;
+        padding: 0 24px 32px 24px;
+    }
+    
+    .stat-card {
+        padding: 24px;
+    }
+    
+    .stat-value {
+        font-size: 28px;
+    }
+    
+    .perfil-resumen-section {
+        padding: 0 24px 32px 24px;
+    }
+    
+    .metric-item {
+        padding: 20px 24px;
+    }
+    
+    .metric-label {
+        font-size: 15px;
+    }
+    
+    .metric-value {
+        font-size: 24px;
+        min-width: 100px;
+    }
+    
+    .metric-badge {
+        font-size: 12px;
+        padding: 5px 10px;
+        min-width: 70px;
+    }
+    
+    .chart-wrapper {
+        margin: 0 24px 32px 24px;
+    }
+    
+    .chart-controls {
+        margin-bottom: 16px;
+    }
+    
+    .chart-filter-btn {
+        padding: 10px 20px;
+        font-size: 14px;
+    }
+    
+    .chart-container {
+        height: 400px;
+        padding: 24px;
+    }
+    
+    .btn-editar-perfil,
+    .btn-registrar-medicion,
+    .btn-borrar-historial {
+        max-width: 400px;
+    }
+}
+
+/* Historial de Mediciones - Tarjetas Expandibles */
+.historial-container {
+    padding: 0 16px 24px 16px;
+}
+
+.historial-empty {
+    text-align: center;
+    padding: 40px 16px;
+    color: var(--text-secondary);
+}
+
+.historial-empty-hint {
+    font-size: 13px;
+    margin-top: 8px;
+    opacity: 0.7;
+}
+
+.historial-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.historial-card {
+    background-color: var(--bg-secondary);
+    border-radius: 12px;
+    padding: 16px;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+    transition: all 0.3s ease;
+    overflow: hidden;
+}
+
+.historial-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    transform: translateY(-2px);
+}
+
+.historial-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+}
+
+.historial-card-fecha {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    flex: 1;
+}
+
+.historial-card-peso {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--accent-color);
+    font-family: var(--font-title-secondary);
+}
+
+.historial-card-arrow {
+    font-size: 12px;
+    color: var(--text-secondary);
+    transition: transform 0.3s ease;
+    margin-left: 8px;
+}
+
+.historial-card.expanded .historial-card-arrow {
+    transform: rotate(180deg);
+}
+
+.historial-card-details {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 16px;
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease, opacity 0.3s ease, margin-top 0.3s ease;
+}
+
+.historial-card.expanded .historial-card-details {
+    max-height: 500px;
+    opacity: 1;
+    margin-top: 16px;
+}
+
+.historial-detail-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.historial-detail-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-secondary);
+}
+
+.historial-detail-value {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.historial-detail-value .na {
+    color: var(--text-secondary);
+    opacity: 0.5;
+    font-style: italic;
+}
+
+.historial-card-actions {
+    grid-column: 1 / -1;
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    margin-top: 8px;
+}
+
+.btn-icon {
+    background: none;
+    border: none;
+    font-size: 18px;
+    cursor: pointer;
+    padding: 6px 12px;
+    border-radius: 6px;
+    transition: background-color 0.2s ease;
+}
+
+.btn-icon:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.btn-icon:active {
+    transform: scale(0.95);
+}
+
+/* Responsive - Tablet y Desktop */
+@media (min-width: 768px) {
+    .historial-container {
+        padding: 0 24px 32px 24px;
+    }
+    
+    .historial-card {
+        padding: 20px;
+    }
+    
+    .historial-card-fecha {
+        font-size: 15px;
+    }
+    
+    .historial-card-peso {
+        font-size: 18px;
+    }
+    
+    .historial-detail-label {
+        font-size: 12px;
+    }
+    
+    .historial-detail-value {
+        font-size: 15px;
     }
 }
 

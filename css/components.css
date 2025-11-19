@@ -146,7 +146,7 @@
     bottom: 90px;
     width: 90%;
     max-width: 500px;
-    z-index: 10;
+    z-index: 1001;
     background-color: var(--accent-color);
     color: var(--text-tertiary);
     box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.3);
@@ -248,16 +248,9 @@
     padding: 0;
     display: grid;
     grid-template-columns: 50px 1fr 50px;
-    grid-template-rows: auto 20px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
     transition: opacity 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
     overflow: hidden;
-}
-
-
-.ejercicio-card.dragging {
-    opacity: 0.5;
-    transform: scale(0.95);
 }
 
 /* Tarjetas de categorías */
@@ -368,34 +361,9 @@
     padding: 16px 0;
 }
 
-/* Drag handle para reordenar ejercicios - ahora en la parte inferior */
-.drag-handle {
-    grid-column: 1 / -1;
-    grid-row: 2;
-    cursor: grab;
-    height: 20px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background-color: rgba(0, 0, 0, 0.3);
-    color: var(--text-secondary);
-    font-size: 14px;
-    user-select: none;
-    transition: background-color 0.2s ease, color 0.2s ease;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-    border-bottom-left-radius: 12px;
-    border-bottom-right-radius: 12px;
-}
-
-.drag-handle:hover {
-    background-color: rgba(255, 255, 255, 0.1);
-    color: var(--text-primary);
-}
-
 /* Modo biblioteca: sin checkbox, solo contenido y botones */
 .ejercicio-card.library-mode {
     grid-template-columns: 1fr 50px;
-    grid-template-rows: auto; /* Sin fila para drag handle */
     padding-left: 16px; /* Un poco de aire a la izquierda ya que no hay checkbox */
 }
 
@@ -413,11 +381,6 @@
     width: 70px;
     height: 70px;
     object-fit: cover;
-}
-
-.drag-handle:active {
-    cursor: grabbing;
-    background-color: rgba(255, 255, 255, 0.15);
 }
 
 /* Checkbox container para checklist diario */
@@ -790,7 +753,7 @@
     justify-content: space-around;
     border-top: 1px solid #333;
     background-color: #000;
-    z-index: 100;
+    z-index: 1000;
 }
 
 .nav-item {

@@ -7,6 +7,7 @@ import {
     getDocs,
     getDoc,
     addDoc,
+    setDoc,
     updateDoc,
     deleteDoc,
     query,
@@ -725,65 +726,6 @@ export async function actualizarRegistroEnEjercicio(entrenoId, ejercicioId, regi
     }
 }
 
-// Función para reordenar ejercicios
-export async function reordenarEjercicios(entrenoId, draggedId, targetId) {
-    try {
-        // Obtener el firestoreId del entreno
-        const firestoreId = await obtenerFirestoreIdDeEntreno(entrenoId);
-        
-        const ejercicios = await obtenerEjerciciosDeEntreno(entrenoId);
-        
-        // Encontrar los índices de los ejercicios
-        const draggedIndex = ejercicios.findIndex(e => e.id === draggedId);
-        const targetIndex = ejercicios.findIndex(e => e.id === targetId);
-        
-        if (draggedIndex === -1 || targetIndex === -1) {
-            return false;
-        }
-        
-        // Si son el mismo, no hacer nada
-        if (draggedIndex === targetIndex) {
-            return true;
-        }
-        
-        // Remover el ejercicio arrastrado del array
-        const [ejercicioArrastrado] = ejercicios.splice(draggedIndex, 1);
-        
-        // Insertar el ejercicio arrastrado en la nueva posición
-        ejercicios.splice(targetIndex, 0, ejercicioArrastrado);
-        
-        // Actualizar el orden en Firestore
-        // Necesitamos actualizar cada ejercicio con un campo de orden
-        // Por ahora, simplemente re-guardamos todos los ejercicios en el nuevo orden
-        // Esto es ineficiente pero funcional. Una mejor solución sería usar un campo 'orden'
-        const ejerciciosCollection = collection(db, `entrenos/${firestoreId}/ejercicios`);
-        const snapshot = await getDocs(ejerciciosCollection);
-        
-        // Eliminar todos los ejercicios
-        const deletePromises = snapshot.docs.map(docSnapshot => 
-            deleteDoc(doc(db, `entrenos/${firestoreId}/ejercicios/${docSnapshot.id}`))
-        );
-        await Promise.all(deletePromises);
-        
-        // Agregar todos los ejercicios en el nuevo orden
-        const addPromises = ejercicios.map(ejercicio => {
-            const ejercicioData = {
-                id: ejercicio.id,
-                nombre: ejercicio.nombre,
-                imagenUrl: ejercicio.imagenUrl,
-                registros: ejercicio.registros || []
-            };
-            return addDoc(ejerciciosCollection, ejercicioData);
-        });
-        await Promise.all(addPromises);
-        
-        return true;
-    } catch (error) {
-        console.error('Error al reordenar ejercicios:', error);
-        throw error;
-    }
-}
-
 // Función de compatibilidad: convertirImagenABase64 ahora devuelve el archivo directamente
 // para que pueda ser subido a Storage
 export async function convertirImagenABase64(file) {
@@ -1084,56 +1026,154 @@ export async function eliminarEjercicioDeCategoria(categoriaId, ejercicioId) {
     }
 }
 
-// Función para reordenar ejercicios de una categoría
-export async function reordenarEjerciciosDeCategoria(categoriaId, draggedId, targetId) {
+// ========== PERFIL DE USUARIO ==========
+
+// Función para guardar/actualizar el perfil del usuario
+export async function guardarPerfil(datos) {
     try {
-        const ejercicios = await obtenerEjerciciosDeCategoria(categoriaId);
+        const perfilRef = doc(db, 'usuarios', 'mi_perfil');
+        await setDoc(perfilRef, {
+            nombre: datos.nombre || '',
+            peso: datos.peso || null,
+            altura: datos.altura || null,
+            edad: datos.edad || null,
+            fechaActualizacion: new Date().toISOString()
+        }, { merge: true });
         
-        // Encontrar los índices de los ejercicios
-        const draggedIndex = ejercicios.findIndex(e => e.id === draggedId);
-        const targetIndex = ejercicios.findIndex(e => e.id === targetId);
-        
-        if (draggedIndex === -1 || targetIndex === -1) {
-            return false;
-        }
-        
-        // Si son el mismo, no hacer nada
-        if (draggedIndex === targetIndex) {
-            return true;
-        }
-        
-        // Remover el ejercicio arrastrado del array
-        const [ejercicioArrastrado] = ejercicios.splice(draggedIndex, 1);
-        
-        // Insertar el ejercicio arrastrado en la nueva posición
-        ejercicios.splice(targetIndex, 0, ejercicioArrastrado);
-        
-        // Actualizar el orden en Firestore
-        // Necesitamos actualizar cada ejercicio con un campo de orden
-        // Por ahora, simplemente re-guardamos todos los ejercicios en el nuevo orden
-        const ejerciciosCollection = collection(db, `categoriasMusculares/${categoriaId}/ejercicios`);
-        const snapshot = await getDocs(ejerciciosCollection);
-        
-        // Eliminar todos los ejercicios
-        const deletePromises = snapshot.docs.map(docSnapshot => 
-            deleteDoc(doc(db, `categoriasMusculares/${categoriaId}/ejercicios/${docSnapshot.id}`))
-        );
-        await Promise.all(deletePromises);
-        
-        // Agregar todos los ejercicios en el nuevo orden
-        const addPromises = ejercicios.map(ejercicio => {
-            const ejercicioData = {
-                nombre: ejercicio.nombre,
-                imagenUrl: ejercicio.imagenUrl,
-                fechaCreacion: ejercicio.fechaCreacion // Mantener la fecha original
-            };
-            return addDoc(ejerciciosCollection, ejercicioData);
-        });
-        await Promise.all(addPromises);
-        
+        console.log('Perfil guardado correctamente');
         return true;
     } catch (error) {
-        console.error('Error al reordenar ejercicios de categoría:', error);
+        console.error('Error al guardar perfil:', error);
+        throw error;
+    }
+}
+
+// Función para obtener el perfil del usuario
+export async function obtenerPerfil() {
+    try {
+        const perfilRef = doc(db, 'usuarios', 'mi_perfil');
+        const perfilSnap = await getDoc(perfilRef);
+        
+        if (perfilSnap.exists()) {
+            return perfilSnap.data();
+        } else {
+            // Si no existe, devolver un objeto vacío
+            return {
+                nombre: '',
+                peso: null,
+                altura: null,
+                edad: null
+            };
+        }
+    } catch (error) {
+        console.error('Error al obtener perfil:', error);
+        throw error;
+    }
+}
+
+// ========== HISTORIAL CORPORAL ==========
+
+// Función para guardar una medición corporal
+export async function guardarMedicion(datos) {
+    try {
+        const medicionData = {
+            fecha: datos.fecha || new Date().toISOString(),
+            peso: datos.peso || null,
+            grasa: datos.grasa || null,
+            musculo: datos.musculo || null,
+            agua: datos.agua || null,
+            visceral: datos.visceral || null,
+            timestamp: datos.fecha ? new Date(datos.fecha).getTime() : Date.now()
+        };
+        
+        const historialCollection = collection(db, 'historialCorporal');
+        await addDoc(historialCollection, medicionData);
+        
+        console.log('Medición guardada correctamente');
+        return true;
+    } catch (error) {
+        console.error('Error al guardar medición:', error);
+        throw error;
+    }
+}
+
+// Función para obtener el historial corporal
+export async function obtenerHistorialCorporal() {
+    try {
+        const historialCollection = collection(db, 'historialCorporal');
+        const q = query(historialCollection, orderBy('timestamp', 'asc'));
+        const snapshot = await getDocs(q);
+        
+        const historial = [];
+        snapshot.forEach(doc => {
+            historial.push({
+                id: doc.id,
+                ...doc.data()
+            });
+        });
+        
+        return historial;
+    } catch (error) {
+        console.error('Error al obtener historial corporal:', error);
+        throw error;
+    }
+}
+
+// Función para actualizar una medición existente
+export async function actualizarMedicion(id, datos) {
+    try {
+        const medicionRef = doc(db, 'historialCorporal', id);
+        const medicionData = {
+            fecha: datos.fecha || new Date().toISOString(),
+            peso: datos.peso || null,
+            grasa: datos.grasa || null,
+            musculo: datos.musculo || null,
+            agua: datos.agua || null,
+            visceral: datos.visceral || null,
+            timestamp: datos.fecha ? new Date(datos.fecha).getTime() : Date.now()
+        };
+        
+        await updateDoc(medicionRef, medicionData);
+        
+        console.log('Medición actualizada correctamente');
+        return true;
+    } catch (error) {
+        console.error('Error al actualizar medición:', error);
+        throw error;
+    }
+}
+
+// Función para eliminar una medición específica
+export async function eliminarMedicion(id) {
+    try {
+        const medicionRef = doc(db, 'historialCorporal', id);
+        await deleteDoc(medicionRef);
+        
+        console.log('Medición eliminada correctamente');
+        return true;
+    } catch (error) {
+        console.error('Error al eliminar medición:', error);
+        throw error;
+    }
+}
+
+// Función para borrar todo el historial corporal (solo para desarrollo)
+export async function borrarTodoHistorialCorporal() {
+    try {
+        const historialCollection = collection(db, 'historialCorporal');
+        const snapshot = await getDocs(historialCollection);
+        
+        const deletePromises = [];
+        snapshot.forEach(doc => {
+            deletePromises.push(deleteDoc(doc.ref));
+        });
+        
+        await Promise.all(deletePromises);
+        
+        console.log(`Se borraron ${deletePromises.length} registros del historial corporal`);
+        return true;
+    } catch (error) {
+        console.error('Error al borrar historial corporal:', error);
         throw error;
     }
 }

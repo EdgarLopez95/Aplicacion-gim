@@ -10,7 +10,6 @@ import {
     agregarRegistroAEjercicio,
     eliminarRegistroDeEjercicio,
     actualizarRegistroEnEjercicio,
-    reordenarEjercicios,
     convertirImagenABase64,
     agregarEjercicioABiblioteca,
     obtenerEjerciciosBiblioteca,
@@ -24,10 +23,16 @@ import {
     obtenerEjerciciosDeCategoria,
     editarEjercicioDeCategoria,
     eliminarEjercicioDeCategoria,
-    reordenarEjerciciosDeCategoria,
     obtenerTodosLosEjerciciosDeBiblioteca,
     sustituirEjercicioEnEntreno,
-    toggleCompletadoEjercicio
+    toggleCompletadoEjercicio,
+    guardarPerfil,
+    obtenerPerfil,
+    guardarMedicion,
+    obtenerHistorialCorporal,
+    borrarTodoHistorialCorporal,
+    actualizarMedicion,
+    eliminarMedicion
 } from './storage.js';
 
 import {
@@ -164,8 +169,6 @@ function configurarEventListenersEntrenoView() {
         });
     }
     
-    // Configurar drag and drop para reordenar ejercicios
-    configurarDragAndDropEjercicios();
 }
 
 // Función para configurar los event listeners del modal de selección
@@ -287,8 +290,8 @@ function configurarEventListenersModalSeleccion() {
                 const onToggle = (id) => toggleCompletado(entrenoActual.id, id);
                 renderizarListaEjercicios(ejerciciosActualizados, null, eliminarEjercicio, mostrarVistaEjercicio, sustituirEjercicio, onToggle);
                 
-                // Re-configurar drag and drop
-                configurarDragAndDropEjercicios();
+                // Actualizar barra de progreso
+                actualizarBarraProgreso();
                 
                 console.log('Ejercicio agregado desde la biblioteca');
             } catch (error) {
@@ -299,256 +302,6 @@ function configurarEventListenersModalSeleccion() {
     });
 }
 
-// Función para configurar drag and drop de ejercicios
-function configurarDragAndDropEjercicios() {
-    // Usar lista-ejercicios-container si existe, sino lista-ejercicios (para compatibilidad)
-    const listaEjercicios = document.getElementById('lista-ejercicios-container') || document.getElementById('lista-ejercicios');
-    if (!listaEjercicios) {
-        return;
-    }
-    
-    let draggedElement = null;
-    let draggedId = null;
-    let touchStartY = null;
-    let touchOffsetY = null;
-    let initialY = null;
-    
-    // Event listener para dragstart - ahora escucha el drag handle
-    listaEjercicios.addEventListener('dragstart', function(e) {
-        // Solo permitir drag en el drag handle
-        if (e.target.classList.contains('drag-handle')) {
-            // Obtener la tarjeta padre que contiene el handle
-            draggedElement = e.target.closest('.ejercicio-card');
-            if (draggedElement) {
-                draggedId = parseInt(draggedElement.dataset.ejercicioId);
-                draggedElement.classList.add('dragging');
-                e.dataTransfer.effectAllowed = 'move';
-                e.dataTransfer.setData('text/html', draggedElement.innerHTML);
-            }
-        }
-    });
-    
-    // Event listener para dragend
-    listaEjercicios.addEventListener('dragend', function(e) {
-        if (draggedElement) {
-            draggedElement.classList.remove('dragging');
-            draggedElement.style.transform = '';
-            draggedElement = null;
-            draggedId = null;
-        }
-    });
-    
-    // Event listener para dragover
-    listaEjercicios.addEventListener('dragover', function(e) {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-        
-        // Encontrar el elemento sobre el que se está arrastrando
-        const afterElement = getDragAfterElement(listaEjercicios, e.clientY);
-        const dragging = listaEjercicios.querySelector('.dragging');
-        
-        if (!dragging) {
-            return;
-        }
-        
-        if (afterElement == null) {
-            listaEjercicios.appendChild(dragging);
-        } else {
-            // CORRECCIÓN: asegurarse de que afterElement es un elemento DOM válido
-            if (afterElement && afterElement.parentNode) {
-                listaEjercicios.insertBefore(dragging, afterElement);
-            }
-        }
-    });
-    
-    // Event listener para drop
-    listaEjercicios.addEventListener('drop', async function(e) {
-        e.preventDefault();
-        
-        if (!draggedId || !entrenoActual || !draggedElement) {
-            return;
-        }
-        
-        // Encontrar el elemento sobre el que se soltó
-        const targetCard = e.target.closest('.ejercicio-card');
-        if (!targetCard) {
-            return;
-        }
-        
-        const targetId = parseInt(targetCard.dataset.ejercicioId);
-        
-        // Si es el mismo elemento, no hacer nada
-        if (targetId === draggedId) {
-            return;
-        }
-        
-        // Reordenar en storage
-        try {
-            await reordenarEjercicios(entrenoActual.id, draggedId, targetId);
-            
-            // Re-renderizar la lista de ejercicios
-            const ejercicios = await obtenerEjerciciosDeEntreno(entrenoActual.id);
-            const onToggle = (id) => toggleCompletado(entrenoActual.id, id);
-            renderizarListaEjercicios(ejercicios, null, eliminarEjercicio, mostrarVistaEjercicio, sustituirEjercicio, onToggle);
-            
-            // Re-configurar los event listeners (incluyendo drag and drop)
-            configurarDragAndDropEjercicios();
-            
-            console.log('Ejercicios reordenados');
-        } catch (error) {
-            console.error('Error al reordenar ejercicios:', error);
-        }
-    });
-    
-    // ========== SOPORTE TÁCTIL PARA MÓVILES ==========
-    
-    // Event listener para touchstart
-    listaEjercicios.addEventListener('touchstart', function(e) {
-        const handle = e.target.closest('.drag-handle');
-        if (!handle) {
-            return;
-        }
-        
-        e.preventDefault();
-        
-        // Obtener la tarjeta padre que contiene el handle
-        draggedElement = handle.closest('.ejercicio-card');
-        if (draggedElement) {
-            draggedId = parseInt(draggedElement.dataset.ejercicioId);
-            draggedElement.classList.add('dragging');
-            
-            // Guardar posición inicial del touch
-            const touch = e.touches[0];
-            touchStartY = touch.clientY;
-            initialY = draggedElement.getBoundingClientRect().top;
-            touchOffsetY = touch.clientY - initialY;
-        }
-    }, { passive: false });
-    
-    // Event listener para touchmove
-    listaEjercicios.addEventListener('touchmove', function(e) {
-        if (!draggedElement || touchStartY === null) {
-            return;
-        }
-        
-        e.preventDefault();
-        
-        const touch = e.touches[0];
-        const currentY = touch.clientY;
-        const deltaY = currentY - touchStartY;
-        
-        // Mover visualmente la tarjeta
-        draggedElement.style.transform = `translateY(${deltaY}px)`;
-        draggedElement.style.transition = 'none';
-        
-        // Encontrar el elemento sobre el que se está "flotando"
-        const afterElement = getDragAfterElement(listaEjercicios, currentY);
-        const dragging = listaEjercicios.querySelector('.dragging');
-        
-        if (!dragging) {
-            return;
-        }
-        
-        // Reordenar visualmente
-        if (afterElement == null) {
-            if (dragging.nextSibling) {
-                listaEjercicios.appendChild(dragging);
-            }
-        } else {
-            if (afterElement && afterElement.parentNode && afterElement !== dragging) {
-                listaEjercicios.insertBefore(dragging, afterElement);
-            }
-        }
-    }, { passive: false });
-    
-    // Event listener para touchend
-    listaEjercicios.addEventListener('touchend', async function(e) {
-        if (!draggedElement || !draggedId || touchStartY === null) {
-            return;
-        }
-        
-        e.preventDefault();
-        
-        // Quitar el transform
-        draggedElement.style.transform = '';
-        draggedElement.style.transition = '';
-        
-        // Encontrar el elemento sobre el que se soltó
-        const touch = e.changedTouches[0];
-        const elementBelow = document.elementFromPoint(touch.clientX, touch.clientY);
-        const targetCard = elementBelow?.closest('.ejercicio-card');
-        
-        if (!targetCard || !entrenoActual) {
-            // Resetear estado
-            draggedElement.classList.remove('dragging');
-            draggedElement = null;
-            draggedId = null;
-            touchStartY = null;
-            touchOffsetY = null;
-            initialY = null;
-            return;
-        }
-        
-        const targetId = parseInt(targetCard.dataset.ejercicioId);
-        
-        // Si es el mismo elemento, no hacer nada
-        if (targetId === draggedId) {
-            draggedElement.classList.remove('dragging');
-            draggedElement = null;
-            draggedId = null;
-            touchStartY = null;
-            touchOffsetY = null;
-            initialY = null;
-            return;
-        }
-        
-        // Reordenar en storage
-        try {
-            await reordenarEjercicios(entrenoActual.id, draggedId, targetId);
-            
-            // Re-renderizar la lista de ejercicios
-            const ejercicios = await obtenerEjerciciosDeEntreno(entrenoActual.id);
-            const onToggle = (id) => toggleCompletado(entrenoActual.id, id);
-            renderizarListaEjercicios(ejercicios, null, eliminarEjercicio, mostrarVistaEjercicio, sustituirEjercicio, onToggle);
-            
-            // Re-configurar los event listeners (incluyendo drag and drop)
-            configurarDragAndDropEjercicios();
-            
-            console.log('Ejercicios reordenados (táctil)');
-        } catch (error) {
-            console.error('Error al reordenar ejercicios:', error);
-        } finally {
-            // Resetear estado
-            draggedElement = null;
-            draggedId = null;
-            touchStartY = null;
-            touchOffsetY = null;
-            initialY = null;
-        }
-    }, { passive: false });
-}
-
-// Función auxiliar para encontrar el elemento después del cual insertar
-function getDragAfterElement(container, y) {
-    const draggableElements = [...container.querySelectorAll('.ejercicio-card:not(.dragging)')];
-    
-    if (draggableElements.length === 0) {
-        return null;
-    }
-    
-    const result = draggableElements.reduce((closest, child) => {
-        const box = child.getBoundingClientRect();
-        const offset = y - box.top - box.height / 2;
-        
-        if (offset < 0 && offset > closest.offset) {
-            return { offset: offset, element: child };
-        } else {
-            return closest;
-        }
-    }, { offset: Number.NEGATIVE_INFINITY });
-    
-    return result.element || null;
-}
 
 // Función para manejar el submit del formulario
 async function manejarSubmitFormulario(e) {
@@ -639,8 +392,8 @@ async function manejarSubmitFormulario(e) {
         const ejercicios = await obtenerEjerciciosDeEntreno(entrenoActual.id);
         renderizarListaEjercicios(ejercicios, null, eliminarEjercicio, mostrarVistaEjercicio, sustituirEjercicio);
         
-        // Re-configurar los event listeners (incluyendo drag and drop)
-        configurarDragAndDropEjercicios();
+        // Actualizar barra de progreso
+        actualizarBarraProgreso();
         
         // Resetear el ID de edición
         currentlyEditingId = null;
@@ -685,8 +438,8 @@ async function mostrarVistaEntreno(entreno) {
         // 3. Cuando lleguen, reemplaza el spinner
         renderizarListaEjercicios(ejercicios, null, eliminarEjercicio, mostrarVistaEjercicio, sustituirEjercicio, onToggle);
         
-        // 4. (Importante) Vuelve a configurar los listeners de la lista (drag/edit/delete)
-        configurarDragAndDropEjercicios();
+        // 4. Actualizar barra de progreso
+        actualizarBarraProgreso();
         
     } catch (error) {
         // Si falla, reemplaza el spinner con un error
@@ -722,10 +475,766 @@ async function mostrarVistaBiblioteca() {
     }
 }
 
+// Función auxiliar para calcular el IMC
+function calcularIMC(peso, altura) {
+    if (!peso || !altura || peso <= 0 || altura <= 0) {
+        return { valor: null, categoria: 'No disponible' };
+    }
+    
+    // Convertir altura de cm a metros
+    const alturaMetros = altura / 100;
+    const imc = peso / (alturaMetros * alturaMetros);
+    const imcRedondeado = Math.round(imc * 10) / 10;
+    
+    // Determinar categoría según OMS
+    let categoria;
+    if (imc < 18.5) {
+        categoria = 'Bajo peso';
+    } else if (imc < 25) {
+        categoria = 'Peso normal';
+    } else if (imc < 30) {
+        categoria = 'Sobrepeso';
+    } else {
+        categoria = 'Obesidad';
+    }
+    
+    return { valor: imcRedondeado, categoria };
+}
+
+// Variable global para la gráfica
+let progressChart = null;
+let historialCorporalGlobal = null; // Guardar historial para filtros
+let filtroGraficaActual = 'peso'; // Filtro activo por defecto
+let medicionEditandoId = null; // ID de la medición que se está editando
+
 // Función para mostrar la vista de perfil
-function mostrarVistaPerfil() {
-    renderizarPerfilView();
-    showView(document.getElementById('perfil-view'));
+async function mostrarVistaPerfil() {
+    try {
+        // 1. Cargar datos del perfil
+        const datosPerfil = await obtenerPerfil();
+        
+        // 2. Calcular IMC
+        const imc = calcularIMC(datosPerfil.peso, datosPerfil.altura);
+        
+        // 3. Obtener historial corporal
+        const historial = await obtenerHistorialCorporal();
+        historialCorporalGlobal = historial; // Guardar para filtros
+        
+        // 4. Obtener último registro para el resumen
+        const ultimaMedicion = historial.length > 0 ? historial[historial.length - 1] : null;
+        
+        // 5. Renderizar la vista con los datos
+        renderizarPerfilView({ 
+            ...datosPerfil, 
+            imc,
+            ultimaMedicion,
+            historial
+        });
+        
+        // 6. Mostrar la vista
+        showView(document.getElementById('perfil-view'));
+        
+        // 7. Configurar event listeners
+        configurarEventListenersPerfil();
+        
+        // 8. Renderizar gráfica con filtro actual
+        renderizarGraficaComposicion(historial, filtroGraficaActual);
+    } catch (error) {
+        console.error('Error al cargar perfil:', error);
+        // Renderizar vista vacía en caso de error
+        renderizarPerfilView({ 
+            nombre: '', 
+            peso: null, 
+            altura: null, 
+            edad: null, 
+            imc: { valor: null, categoria: 'No disponible' },
+            ultimaMedicion: null
+        });
+        showView(document.getElementById('perfil-view'));
+        configurarEventListenersPerfil();
+        historialCorporalGlobal = [];
+        renderizarGraficaComposicion([], filtroGraficaActual);
+    }
+}
+
+// Función para renderizar la gráfica de composición corporal
+function renderizarGraficaComposicion(historial, filtro = 'peso') {
+    const canvas = document.getElementById('progressChart');
+    if (!canvas) {
+        console.error('Canvas de gráfica no encontrado');
+        return;
+    }
+    
+    // Destruir gráfica anterior si existe
+    if (progressChart) {
+        progressChart.destroy();
+        progressChart = null;
+    }
+    
+    // Si no hay datos, mostrar gráfica vacía
+    if (!historial || historial.length === 0) {
+        const ctx = canvas.getContext('2d');
+        progressChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: []
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        labels: {
+                            color: '#FFFFFF'
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: { color: '#b0b0b0' },
+                        grid: { color: '#333' }
+                    },
+                    y: {
+                        ticks: { color: '#b0b0b0' },
+                        grid: { color: '#333' },
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+        return;
+    }
+    
+    // Preparar datos según el filtro
+    const { labels, datasets, yAxisConfig } = prepararDatosGrafica(historial, filtro);
+    
+    const ctx = canvas.getContext('2d');
+    progressChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: datasets
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: true,
+                    labels: {
+                        color: '#FFFFFF',
+                        font: {
+                            size: 12
+                        }
+                    }
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                    titleColor: '#FFFFFF',
+                    bodyColor: '#FFFFFF',
+                    borderColor: '#333',
+                    borderWidth: 1
+                }
+            },
+            scales: {
+                x: {
+                    ticks: { 
+                        color: '#b0b0b0',
+                        maxRotation: 45,
+                        minRotation: 45
+                    },
+                    grid: { 
+                        color: '#333'
+                    }
+                },
+                    y: {
+                        ticks: { 
+                            color: '#b0b0b0'
+                        },
+                        grid: { 
+                            color: '#333'
+                        },
+                        beginAtZero: false, // No forzar comenzar en cero para mejor visualización
+                        ...yAxisConfig
+                    }
+            }
+        }
+    });
+}
+
+// Función para preparar datos según el filtro
+function prepararDatosGrafica(historial, filtro) {
+    // Formatear fechas de forma simple y consistente
+    const fechas = historial.map(m => {
+        try {
+            const fecha = new Date(m.fecha);
+            // Verificar que la fecha sea válida
+            if (isNaN(fecha.getTime())) {
+                console.warn('Fecha inválida:', m.fecha);
+                return '';
+            }
+            // Formato simple: DD/MM
+            const dia = String(fecha.getDate()).padStart(2, '0');
+            const mes = String(fecha.getMonth() + 1).padStart(2, '0');
+            return `${dia}/${mes}`;
+        } catch (error) {
+            console.error('Error al formatear fecha:', error, m.fecha);
+            return '';
+        }
+    });
+    
+    let datasets = [];
+    let yAxisConfig = {};
+    
+    switch (filtro) {
+        case 'peso':
+            const pesoData = historial.map(m => m.peso || null);
+            datasets = [{
+                label: 'Peso (kg)',
+                data: pesoData,
+                borderColor: '#00ff88',
+                backgroundColor: 'rgba(0, 255, 136, 0.1)',
+                tension: 0.4,
+                fill: false
+            }];
+            yAxisConfig = {
+                suggestedMin: 60,
+                suggestedMax: 85,
+                title: {
+                    display: true,
+                    text: 'Peso (kg)',
+                    color: '#b0b0b0'
+                }
+            };
+            break;
+            
+        case 'grasa':
+            const grasaData = historial.map(m => m.grasa || null);
+            datasets = [{
+                label: 'Grasa (%)',
+                data: grasaData,
+                borderColor: '#ff4444',
+                backgroundColor: 'rgba(255, 68, 68, 0.1)',
+                tension: 0.4,
+                fill: false
+            }];
+            yAxisConfig = {
+                suggestedMin: 5,
+                suggestedMax: 35,
+                title: {
+                    display: true,
+                    text: 'Porcentaje (%)',
+                    color: '#b0b0b0'
+                }
+            };
+            break;
+            
+        case 'musculo':
+            const musculoData = historial.map(m => m.musculo || null);
+            datasets = [{
+                label: 'Músculo (%)',
+                data: musculoData,
+                borderColor: '#44ff44',
+                backgroundColor: 'rgba(68, 255, 68, 0.1)',
+                tension: 0.4,
+                fill: false
+            }];
+            yAxisConfig = {
+                suggestedMin: 25,
+                suggestedMax: 55,
+                title: {
+                    display: true,
+                    text: 'Porcentaje (%)',
+                    color: '#b0b0b0'
+                }
+            };
+            break;
+            
+        default:
+            datasets = [];
+            yAxisConfig = {};
+    }
+    
+    return { labels: fechas, datasets, yAxisConfig };
+}
+
+// Función para actualizar la gráfica con un nuevo filtro
+function actualizarGraficaConFiltro(historial, filtro) {
+    if (!progressChart) {
+        // Si no existe la gráfica, crearla
+        renderizarGraficaComposicion(historial, filtro);
+        return;
+    }
+    
+    const { labels, datasets, yAxisConfig } = prepararDatosGrafica(historial, filtro);
+    
+    // Actualizar labels y datasets
+    progressChart.data.labels = labels;
+    progressChart.data.datasets = datasets;
+    
+    // Actualizar eje Y con todas las opciones de escala
+    if (progressChart.options.scales.y) {
+        // Aplicar suggestedMin y suggestedMax
+        if (yAxisConfig.suggestedMin !== undefined) {
+            progressChart.options.scales.y.suggestedMin = yAxisConfig.suggestedMin;
+        }
+        if (yAxisConfig.suggestedMax !== undefined) {
+            progressChart.options.scales.y.suggestedMax = yAxisConfig.suggestedMax;
+        }
+        // Limpiar min/max estrictos si existen
+        delete progressChart.options.scales.y.min;
+        delete progressChart.options.scales.y.max;
+        // Actualizar título
+        if (yAxisConfig.title) {
+            progressChart.options.scales.y.title = yAxisConfig.title;
+        }
+    }
+    
+    // Actualizar la gráfica
+    progressChart.update('none'); // 'none' para animación más rápida
+}
+
+// Función para configurar event listeners del perfil
+function configurarEventListenersPerfil() {
+    const btnEditarPerfil = document.getElementById('btn-editar-perfil');
+    const btnCancelarPerfil = document.getElementById('btn-cancelar-perfil');
+    const formPerfil = document.getElementById('form-perfil');
+    const btnRegistrarMedicion = document.getElementById('btn-registrar-medicion');
+    const btnCancelarMedicion = document.getElementById('btn-cancelar-medicion');
+    const formMedicion = document.getElementById('form-medicion');
+    
+    // Botón editar perfil
+    if (btnEditarPerfil) {
+        btnEditarPerfil.addEventListener('click', function() {
+            mostrarModalPerfil();
+        });
+    }
+    
+    // Botón cancelar perfil
+    if (btnCancelarPerfil) {
+        btnCancelarPerfil.addEventListener('click', function() {
+            ocultarModalPerfil();
+        });
+    }
+    
+    // Formulario guardar perfil
+    if (formPerfil) {
+        formPerfil.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            await manejarGuardarPerfil();
+        });
+    }
+    
+    // Botón registrar medición
+    if (btnRegistrarMedicion) {
+        btnRegistrarMedicion.addEventListener('click', function() {
+            mostrarModalMedicion();
+        });
+    }
+    
+    // Botón cancelar medición
+    if (btnCancelarMedicion) {
+        btnCancelarMedicion.addEventListener('click', function() {
+            ocultarModalMedicion();
+        });
+    }
+    
+    // Formulario guardar medición
+    if (formMedicion) {
+        formMedicion.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            await manejarGuardarMedicion();
+        });
+    }
+    
+    // Botones de filtro de gráfica
+    const filterButtons = document.querySelectorAll('.chart-filter-btn');
+    filterButtons.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const filtro = this.dataset.filter;
+            
+            // Actualizar estado visual de botones
+            filterButtons.forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            
+            // Actualizar gráfica
+            filtroGraficaActual = filtro;
+            if (historialCorporalGlobal) {
+                actualizarGraficaConFiltro(historialCorporalGlobal, filtro);
+            }
+        });
+    });
+    
+    // Botón borrar historial
+    const btnBorrarHistorial = document.getElementById('btn-borrar-historial');
+    if (btnBorrarHistorial) {
+        btnBorrarHistorial.addEventListener('click', async function() {
+            const confirmar = confirm('¿Estás seguro de que quieres borrar TODO el historial corporal? Esta acción no se puede deshacer.');
+            if (!confirmar) return;
+            
+            try {
+                await borrarTodoHistorialCorporal();
+                historialCorporalGlobal = [];
+                // Recargar la vista
+                await mostrarVistaPerfil();
+                alert('Historial borrado correctamente');
+            } catch (error) {
+                console.error('Error al borrar historial:', error);
+                alert('Error al borrar el historial. Por favor, intenta de nuevo.');
+            }
+        });
+    }
+    
+    // Tarjetas de historial expandibles
+    const historialCards = document.querySelectorAll('.historial-card');
+    historialCards.forEach(card => {
+        // Click en la tarjeta para expandir/colapsar
+        const cardHeader = card.querySelector('.historial-card-header');
+        if (cardHeader) {
+            cardHeader.addEventListener('click', function(e) {
+                // No expandir si se hace clic en los botones de acción
+                if (e.target.closest('.btn-icon')) {
+                    return;
+                }
+                card.classList.toggle('expanded');
+            });
+        }
+    });
+    
+    // Botones de editar medición
+    const botonesEditar = document.querySelectorAll('.btn-editar-medicion');
+    botonesEditar.forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation(); // Evitar que se expanda/colapse la tarjeta
+            const id = this.dataset.id;
+            if (id) {
+                mostrarModalEditarMedicion(id);
+            }
+        });
+    });
+    
+    // Botones de eliminar medición
+    const botonesEliminar = document.querySelectorAll('.btn-eliminar-medicion');
+    botonesEliminar.forEach(btn => {
+        btn.addEventListener('click', async function(e) {
+            e.stopPropagation(); // Evitar que se expanda/colapse la tarjeta
+            const id = this.dataset.id;
+            if (!id) return;
+            
+            const confirmar = confirm('¿Estás seguro de que quieres eliminar esta medición? Esta acción no se puede deshacer.');
+            if (!confirmar) return;
+            
+            try {
+                await eliminarMedicion(id);
+                
+                // Actualizar historial global
+                historialCorporalGlobal = await obtenerHistorialCorporal();
+                
+                // Recargar la vista
+                await mostrarVistaPerfil();
+                
+                // Restaurar el filtro activo
+                const activeFilterBtn = document.querySelector(`.chart-filter-btn[data-filter="${filtroGraficaActual}"]`);
+                if (activeFilterBtn) {
+                    document.querySelectorAll('.chart-filter-btn').forEach(b => b.classList.remove('active'));
+                    activeFilterBtn.classList.add('active');
+                }
+                
+                alert('Medición eliminada correctamente');
+            } catch (error) {
+                console.error('Error al eliminar medición:', error);
+                alert('Error al eliminar la medición. Por favor, intenta de nuevo.');
+            }
+        });
+    });
+}
+
+// Función para manejar el guardado del perfil
+async function manejarGuardarPerfil() {
+    const form = document.getElementById('form-perfil');
+    if (!form) return;
+    
+    const nombre = form.querySelector('#nombre-perfil').value.trim();
+    const peso = parseFloat(form.querySelector('#peso-perfil').value);
+    const altura = parseFloat(form.querySelector('#altura-perfil').value);
+    const edad = parseInt(form.querySelector('#edad-perfil').value);
+    
+    // Validaciones básicas
+    if (!nombre) {
+        alert('Por favor, ingresa tu nombre');
+        return;
+    }
+    
+    if (peso && (peso <= 0 || peso > 500)) {
+        alert('Por favor, ingresa un peso válido (entre 1 y 500 kg)');
+        return;
+    }
+    
+    if (altura && (altura <= 0 || altura > 300)) {
+        alert('Por favor, ingresa una altura válida (entre 1 y 300 cm)');
+        return;
+    }
+    
+    if (edad && (edad <= 0 || edad > 150)) {
+        alert('Por favor, ingresa una edad válida (entre 1 y 150 años)');
+        return;
+    }
+    
+    const boton = form.querySelector('button[type="submit"]');
+    if (boton) {
+        boton.classList.add('is-loading');
+    }
+    
+    try {
+        // Guardar en Firebase
+        await guardarPerfil({
+            nombre,
+            peso: peso || null,
+            altura: altura || null,
+            edad: edad || null
+        });
+        
+        // Recargar la vista
+        await mostrarVistaPerfil();
+        
+        // Cerrar modal
+        ocultarModalPerfil();
+        
+        console.log('Perfil actualizado correctamente');
+    } catch (error) {
+        console.error('Error al guardar perfil:', error);
+        alert('Error al guardar el perfil. Por favor, intenta de nuevo.');
+    } finally {
+        if (boton) {
+            boton.classList.remove('is-loading');
+        }
+    }
+}
+
+// Función para mostrar el modal de perfil
+async function mostrarModalPerfil() {
+    const modal = document.getElementById('modal-perfil');
+    if (!modal) return;
+    
+    // Cargar datos actuales desde Firebase
+    try {
+        const datosPerfil = await obtenerPerfil();
+        const form = document.getElementById('form-perfil');
+        if (form) {
+            form.querySelector('#nombre-perfil').value = datosPerfil.nombre || '';
+            form.querySelector('#peso-perfil').value = datosPerfil.peso || '';
+            form.querySelector('#altura-perfil').value = datosPerfil.altura || '';
+            form.querySelector('#edad-perfil').value = datosPerfil.edad || '';
+        }
+    } catch (error) {
+        console.error('Error al cargar datos del perfil:', error);
+        // Si falla, intentar cargar desde el DOM
+        const datosPerfil = document.querySelector('.perfil-data');
+        if (datosPerfil) {
+            const nombre = datosPerfil.dataset.nombre || '';
+            const peso = datosPerfil.dataset.peso || '';
+            const altura = datosPerfil.dataset.altura || '';
+            const edad = datosPerfil.dataset.edad || '';
+            
+            const form = document.getElementById('form-perfil');
+            if (form) {
+                form.querySelector('#nombre-perfil').value = nombre;
+                form.querySelector('#peso-perfil').value = peso;
+                form.querySelector('#altura-perfil').value = altura;
+                form.querySelector('#edad-perfil').value = edad;
+            }
+        }
+    }
+    
+    modal.style.display = 'flex';
+    modal.classList.add('active');
+}
+
+// Función para ocultar el modal de perfil
+function ocultarModalPerfil() {
+    const modal = document.getElementById('modal-perfil');
+    if (!modal) return;
+    
+    modal.style.display = 'none';
+    modal.classList.remove('active');
+}
+
+// Función para mostrar el modal de medición (nuevo registro)
+function mostrarModalMedicion() {
+    const modal = document.getElementById('modal-medicion');
+    if (!modal) return;
+    
+    // Resetear estado de edición
+    medicionEditandoId = null;
+    
+    // Actualizar título del modal
+    const modalTitulo = modal.querySelector('h3');
+    if (modalTitulo) {
+        modalTitulo.textContent = 'Registrar Medición';
+    }
+    
+    // Limpiar y establecer fecha actual por defecto
+    const form = document.getElementById('form-medicion');
+    if (form) {
+        form.reset();
+        const fechaInput = form.querySelector('#fecha-medicion');
+        if (fechaInput) {
+            const hoy = new Date().toISOString().split('T')[0];
+            fechaInput.value = hoy;
+        }
+    }
+    
+    modal.style.display = 'flex';
+    modal.classList.add('active');
+}
+
+// Función para mostrar el modal de medición (editar registro)
+async function mostrarModalEditarMedicion(id) {
+    const modal = document.getElementById('modal-medicion');
+    if (!modal) return;
+    
+    try {
+        // Obtener datos del registro
+        const historial = historialCorporalGlobal || await obtenerHistorialCorporal();
+        const medicion = historial.find(m => m.id === id);
+        
+        if (!medicion) {
+            alert('No se encontró la medición a editar');
+            return;
+        }
+        
+        // Establecer estado de edición
+        medicionEditandoId = id;
+        
+        // Actualizar título del modal
+        const modalTitulo = modal.querySelector('h3');
+        if (modalTitulo) {
+            modalTitulo.textContent = 'Editar Medición';
+        }
+        
+        // Rellenar formulario con datos existentes
+        const form = document.getElementById('form-medicion');
+        if (form) {
+            const fechaInput = form.querySelector('#fecha-medicion');
+            const pesoInput = form.querySelector('#peso-medicion');
+            const grasaInput = form.querySelector('#grasa-medicion');
+            const musculoInput = form.querySelector('#musculo-medicion');
+            const aguaInput = form.querySelector('#agua-medicion');
+            const visceralInput = form.querySelector('#visceral-medicion');
+            
+            if (fechaInput && medicion.fecha) {
+                const fecha = new Date(medicion.fecha);
+                fechaInput.value = fecha.toISOString().split('T')[0];
+            }
+            if (pesoInput) pesoInput.value = medicion.peso || '';
+            if (grasaInput) grasaInput.value = medicion.grasa || '';
+            if (musculoInput) musculoInput.value = medicion.musculo || '';
+            if (aguaInput) aguaInput.value = medicion.agua || '';
+            if (visceralInput) visceralInput.value = medicion.visceral || '';
+        }
+        
+        modal.style.display = 'flex';
+        modal.classList.add('active');
+    } catch (error) {
+        console.error('Error al cargar medición para editar:', error);
+        alert('Error al cargar la medición. Por favor, intenta de nuevo.');
+    }
+}
+
+// Función para ocultar el modal de medición
+function ocultarModalMedicion() {
+    const modal = document.getElementById('modal-medicion');
+    if (!modal) return;
+    
+    modal.style.display = 'none';
+    modal.classList.remove('active');
+}
+
+// Función para manejar el guardado de medición
+async function manejarGuardarMedicion() {
+    const form = document.getElementById('form-medicion');
+    if (!form) return;
+    
+    const fecha = form.querySelector('#fecha-medicion').value;
+    const peso = parseFloat(form.querySelector('#peso-medicion').value);
+    const grasa = parseFloat(form.querySelector('#grasa-medicion').value);
+    const musculo = parseFloat(form.querySelector('#musculo-medicion').value);
+    const agua = parseFloat(form.querySelector('#agua-medicion').value);
+    const visceral = parseFloat(form.querySelector('#visceral-medicion').value);
+    
+    // Validaciones básicas
+    if (!fecha) {
+        alert('Por favor, selecciona una fecha');
+        return;
+    }
+    
+    if (!peso || peso <= 0 || peso > 500) {
+        alert('Por favor, ingresa un peso válido (entre 1 y 500 kg)');
+        return;
+    }
+    
+    const boton = form.querySelector('button[type="submit"]');
+    if (boton) {
+        boton.classList.add('is-loading');
+    }
+    
+    try {
+        // Guardar o actualizar en Firebase
+        if (medicionEditandoId) {
+            // Actualizar medición existente
+            await actualizarMedicion(medicionEditandoId, {
+                fecha,
+                peso,
+                grasa: grasa || null,
+                musculo: musculo || null,
+                agua: agua || null,
+                visceral: visceral || null
+            });
+            console.log('Medición actualizada correctamente');
+        } else {
+            // Crear nueva medición
+            await guardarMedicion({
+                fecha,
+                peso,
+                grasa: grasa || null,
+                musculo: musculo || null,
+                agua: agua || null,
+                visceral: visceral || null
+            });
+            console.log('Medición guardada correctamente');
+        }
+        
+        // Resetear estado de edición
+        medicionEditandoId = null;
+        
+        // Actualizar historial global
+        historialCorporalGlobal = await obtenerHistorialCorporal();
+        
+        // Recargar la vista
+        await mostrarVistaPerfil();
+        
+        // Restaurar el filtro activo
+        const activeFilterBtn = document.querySelector(`.chart-filter-btn[data-filter="${filtroGraficaActual}"]`);
+        if (activeFilterBtn) {
+            document.querySelectorAll('.chart-filter-btn').forEach(b => b.classList.remove('active'));
+            activeFilterBtn.classList.add('active');
+        }
+        
+        // Cerrar modal
+        ocultarModalMedicion();
+        
+        // Limpiar formulario
+        form.reset();
+    } catch (error) {
+        console.error('Error al guardar medición:', error);
+        alert('Error al guardar la medición. Por favor, intenta de nuevo.');
+    } finally {
+        if (boton) {
+            boton.classList.remove('is-loading');
+        }
+    }
 }
 
 // Función para configurar los event listeners de la vista de biblioteca (categorías)
@@ -971,9 +1480,6 @@ async function mostrarVistaCategoriaEjercicios(categoriaId, categoriaNombre) {
         // 3. Cuando lleguen, reemplaza el spinner
         renderizarListaEjerciciosCategoria(ejercicios, editarEjercicioCategoriaHandler, eliminarEjercicioCategoriaHandler);
         
-        // 4. Configurar drag and drop
-        configurarDragAndDropEjerciciosCategoria();
-        
     } catch (error) {
         // Si falla, reemplaza el spinner con un error
         const listaContainer = document.getElementById('lista-ejercicios-categoria-container');
@@ -1110,10 +1616,7 @@ async function manejarSubmitEjercicioCategoria(e) {
         const ejercicios = await obtenerEjerciciosDeCategoria(categoriaActual.id);
         renderizarListaEjerciciosCategoria(ejercicios, editarEjercicioCategoriaHandler, eliminarEjercicioCategoriaHandler);
         
-        // 5. Re-configurar drag and drop
-        configurarDragAndDropEjerciciosCategoria();
-        
-        // 6. Cerrar el modal
+        // 5. Cerrar el modal
         ocultarModalEjercicioCategoria();
         
         // 7. Resetear el ID de edición
@@ -1155,9 +1658,6 @@ async function eliminarEjercicioCategoriaHandler(ejercicioId, botonElement) {
         await eliminarEjercicioDeCategoria(categoriaActual.id, ejercicioId);
         const ejercicios = await obtenerEjerciciosDeCategoria(categoriaActual.id);
         renderizarListaEjerciciosCategoria(ejercicios, editarEjercicioCategoriaHandler, eliminarEjercicioCategoriaHandler);
-        
-        // Re-configurar los event listeners (incluyendo drag and drop)
-        configurarDragAndDropEjerciciosCategoria();
         console.log('Ejercicio de categoría eliminado:', ejercicioId);
     } catch (error) {
         // 3. Manejar el error
@@ -1199,241 +1699,6 @@ async function editarEjercicioCategoriaHandler(ejercicioId) {
     mostrarModalEjercicioCategoria();
 }
 
-// Función para configurar drag and drop para ejercicios de categoría
-function configurarDragAndDropEjerciciosCategoria() {
-    const listaEjercicios = document.getElementById('lista-ejercicios-categoria-container');
-    if (!listaEjercicios) {
-        return;
-    }
-    
-    if (!categoriaActual) {
-        return;
-    }
-    
-    let draggedElement = null;
-    let draggedId = null;
-    let touchStartY = null;
-    let touchOffsetY = null;
-    let initialY = null;
-    
-    // Event listener para dragstart - ahora escucha el drag handle
-    listaEjercicios.addEventListener('dragstart', function(e) {
-        // Solo permitir drag en el drag handle
-        if (e.target.classList.contains('drag-handle')) {
-            // Obtener la tarjeta padre que contiene el handle
-            draggedElement = e.target.closest('.ejercicio-card');
-            if (draggedElement) {
-                draggedId = draggedElement.dataset.ejercicioId;
-                draggedElement.classList.add('dragging');
-                e.dataTransfer.effectAllowed = 'move';
-                e.dataTransfer.setData('text/html', draggedElement.innerHTML);
-            }
-        }
-    });
-    
-    // Event listener para dragend
-    listaEjercicios.addEventListener('dragend', function(e) {
-        if (draggedElement) {
-            draggedElement.classList.remove('dragging');
-            draggedElement.style.transform = '';
-            draggedElement = null;
-            draggedId = null;
-        }
-    });
-    
-    // Event listener para dragover
-    listaEjercicios.addEventListener('dragover', function(e) {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-        
-        // Encontrar el elemento sobre el que se está arrastrando
-        const afterElement = getDragAfterElement(listaEjercicios, e.clientY);
-        const dragging = listaEjercicios.querySelector('.dragging');
-        
-        if (!dragging) {
-            return;
-        }
-        
-        if (afterElement == null) {
-            listaEjercicios.appendChild(dragging);
-        } else {
-            // CORRECCIÓN: asegurarse de que afterElement es un elemento DOM válido
-            if (afterElement && afterElement.parentNode) {
-                listaEjercicios.insertBefore(dragging, afterElement);
-            }
-        }
-    });
-    
-    // Event listener para drop
-    listaEjercicios.addEventListener('drop', async function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        
-        if (!draggedId || !categoriaActual || !draggedElement) {
-            return;
-        }
-        
-        // Encontrar el elemento sobre el que se soltó
-        const targetCard = e.target.closest('.ejercicio-card');
-        if (!targetCard) {
-            return;
-        }
-        
-        const targetId = targetCard.dataset.ejercicioId;
-        
-        // Si es el mismo elemento, no hacer nada
-        if (targetId === draggedId) {
-            return;
-        }
-        
-        // Reordenar en storage
-        try {
-            await reordenarEjerciciosDeCategoria(categoriaActual.id, draggedId, targetId);
-            
-            // Obtener los ejercicios actualizados
-            const ejercicios = await obtenerEjerciciosDeCategoria(categoriaActual.id);
-            
-            // Re-renderizar la lista de ejercicios (esto limpiará el contenedor y volverá a renderizar)
-            renderizarListaEjerciciosCategoria(ejercicios, editarEjercicioCategoriaHandler, eliminarEjercicioCategoriaHandler);
-            
-            // Re-configurar los event listeners (incluyendo drag and drop)
-            configurarDragAndDropEjerciciosCategoria();
-            
-            console.log('Ejercicios de categoría reordenados');
-        } catch (error) {
-            console.error('Error al reordenar ejercicios de categoría:', error);
-            // En caso de error, también re-renderizar para restaurar el estado
-            const ejercicios = await obtenerEjerciciosDeCategoria(categoriaActual.id);
-            renderizarListaEjerciciosCategoria(ejercicios, editarEjercicioCategoriaHandler, eliminarEjercicioCategoriaHandler);
-            configurarDragAndDropEjerciciosCategoria();
-        }
-    });
-    
-    // ========== SOPORTE TÁCTIL PARA MÓVILES ==========
-    
-    // Event listener para touchstart
-    listaEjercicios.addEventListener('touchstart', function(e) {
-        const handle = e.target.closest('.drag-handle');
-        if (!handle) {
-            return;
-        }
-        
-        e.preventDefault();
-        
-        // Obtener la tarjeta padre que contiene el handle
-        draggedElement = handle.closest('.ejercicio-card');
-        if (draggedElement) {
-            draggedId = draggedElement.dataset.ejercicioId;
-            draggedElement.classList.add('dragging');
-            
-            // Guardar posición inicial del touch
-            const touch = e.touches[0];
-            touchStartY = touch.clientY;
-            initialY = draggedElement.getBoundingClientRect().top;
-            touchOffsetY = touch.clientY - initialY;
-        }
-    }, { passive: false });
-    
-    // Event listener para touchmove
-    listaEjercicios.addEventListener('touchmove', function(e) {
-        if (!draggedElement || touchStartY === null) {
-            return;
-        }
-        
-        e.preventDefault();
-        
-        const touch = e.touches[0];
-        const currentY = touch.clientY;
-        const deltaY = currentY - touchStartY;
-        
-        // Mover visualmente la tarjeta
-        draggedElement.style.transform = `translateY(${deltaY}px)`;
-        draggedElement.style.transition = 'none';
-        
-        // Encontrar el elemento sobre el que se está "flotando"
-        const afterElement = getDragAfterElement(listaEjercicios, currentY);
-        const dragging = listaEjercicios.querySelector('.dragging');
-        
-        if (!dragging) {
-            return;
-        }
-        
-        // Reordenar visualmente
-        if (afterElement == null) {
-            listaEjercicios.appendChild(dragging);
-        } else {
-            if (afterElement && afterElement.parentNode) {
-                listaEjercicios.insertBefore(dragging, afterElement);
-            }
-        }
-    }, { passive: false });
-    
-    // Event listener para touchend
-    listaEjercicios.addEventListener('touchend', async function(e) {
-        if (!draggedElement || !draggedId || touchStartY === null) {
-            return;
-        }
-        
-        e.preventDefault();
-        
-        // Quitar el transform
-        draggedElement.style.transform = '';
-        draggedElement.style.transition = '';
-        
-        // Encontrar el elemento sobre el que se soltó
-        const touch = e.changedTouches[0];
-        const elementBelow = document.elementFromPoint(touch.clientX, touch.clientY);
-        const targetCard = elementBelow?.closest('.ejercicio-card');
-        
-        if (!targetCard || !categoriaActual) {
-            // Resetear estado
-            draggedElement.classList.remove('dragging');
-            draggedElement = null;
-            draggedId = null;
-            touchStartY = null;
-            touchOffsetY = null;
-            initialY = null;
-            return;
-        }
-        
-        const targetId = targetCard.dataset.ejercicioId;
-        
-        // Si es el mismo elemento, no hacer nada
-        if (targetId === draggedId) {
-            draggedElement.classList.remove('dragging');
-            draggedElement = null;
-            draggedId = null;
-            touchStartY = null;
-            touchOffsetY = null;
-            initialY = null;
-            return;
-        }
-        
-        // Reordenar en storage
-        try {
-            await reordenarEjerciciosDeCategoria(categoriaActual.id, draggedId, targetId);
-            
-            // Re-renderizar la lista de ejercicios
-            const ejercicios = await obtenerEjerciciosDeCategoria(categoriaActual.id);
-            renderizarListaEjerciciosCategoria(ejercicios, editarEjercicioCategoriaHandler, eliminarEjercicioCategoriaHandler);
-            
-            // Re-configurar los event listeners (incluyendo drag and drop)
-            configurarDragAndDropEjerciciosCategoria();
-            
-            console.log('Ejercicios de categoría reordenados');
-        } catch (error) {
-            console.error('Error al reordenar ejercicios de categoría:', error);
-        }
-        
-        // Resetear estado
-        draggedElement.classList.remove('dragging');
-        draggedElement = null;
-        draggedId = null;
-        touchStartY = null;
-        touchOffsetY = null;
-        initialY = null;
-    }, { passive: false });
-}
 
 // Función para editar un ejercicio de la biblioteca (maneja la UI)
 async function editarEjercicioBibliotecaHandler(ejercicioId) {
@@ -1826,8 +2091,9 @@ async function eliminarEjercicio(ejercicioId, botonElement) {
         const ejercicios = await obtenerEjerciciosDeEntreno(entrenoActual.id);
         renderizarListaEjercicios(ejercicios, null, eliminarEjercicio, mostrarVistaEjercicio, sustituirEjercicio);
         
-        // Re-configurar los event listeners (incluyendo drag and drop)
-        configurarDragAndDropEjercicios();
+        // Actualizar barra de progreso
+        actualizarBarraProgreso();
+        
         console.log('Ejercicio eliminado:', ejercicioId);
     } catch (error) {
         // 3. Manejar el error
@@ -1837,6 +2103,45 @@ async function eliminarEjercicio(ejercicioId, botonElement) {
         if (boton) {
             boton.classList.remove('is-loading');
         }
+    }
+}
+
+// Función para actualizar la barra de progreso
+function actualizarBarraProgreso() {
+    const listaContainer = document.getElementById('lista-ejercicios-container');
+    if (!listaContainer) {
+        return;
+    }
+    
+    // Contar todas las tarjetas de ejercicio
+    const todasLasTarjetas = listaContainer.querySelectorAll('.ejercicio-card');
+    const total = todasLasTarjetas.length;
+    
+    // Contar las tarjetas completadas (tienen la clase card-completed o el checkbox marcado)
+    const completadas = Array.from(todasLasTarjetas).filter(card => {
+        return card.classList.contains('card-completed') || 
+               card.querySelector('.btn-check:checked') !== null;
+    }).length;
+    
+    // Calcular el porcentaje (manejar división por cero)
+    const porcentaje = total > 0 ? Math.round((completadas / total) * 100) : 0;
+    
+    // Actualizar el ancho de la barra de progreso
+    const progressFill = document.getElementById('progress-fill');
+    if (progressFill) {
+        progressFill.style.width = `${porcentaje}%`;
+    }
+    
+    // Actualizar el porcentaje de texto
+    const progressPercent = document.getElementById('progress-percent');
+    if (progressPercent) {
+        progressPercent.textContent = `${porcentaje}%`;
+    }
+    
+    // Actualizar el texto de detalle
+    const progressText = document.getElementById('progress-text');
+    if (progressText) {
+        progressText.textContent = `${completadas} de ${total} ejercicios`;
     }
 }
 
@@ -1866,13 +2171,8 @@ async function toggleCompletado(entrenoId, ejercicioId) {
         const onToggle = (id) => toggleCompletado(entrenoId, id);
         renderizarListaEjercicios(ejerciciosActuales, null, eliminarEjercicio, mostrarVistaEjercicio, sustituirEjercicio, onToggle);
         
-        // Re-configurar drag and drop
-        configurarDragAndDropEjercicios();
-        
-        // Actualizar barra de progreso si existe
-        if (typeof actualizarBarraProgreso === 'function') {
-            actualizarBarraProgreso();
-        }
+        // Actualizar barra de progreso
+        actualizarBarraProgreso();
         
         // Paso 4: Enviar a Firebase (sin await bloqueante)
         toggleCompletadoEjercicio(entrenoId, ejercicioId).catch(error => {
@@ -1885,7 +2185,9 @@ async function toggleCompletado(entrenoId, ejercicioId) {
             
             // Volver a pintar con el estado original
             renderizarListaEjercicios(ejerciciosActuales, null, eliminarEjercicio, mostrarVistaEjercicio, sustituirEjercicio, onToggle);
-            configurarDragAndDropEjercicios();
+            
+            // Actualizar barra de progreso
+            actualizarBarraProgreso();
             
             // Mostrar error al usuario
             if (typeof showInfoModal === 'function') {
@@ -2102,8 +2404,8 @@ function configurarEventListenersModalSeleccionSustitucion(ejercicioIdOriginal) 
                 const onToggle = (id) => toggleCompletado(entrenoActual.id, id);
                 renderizarListaEjercicios(ejerciciosActualizados, null, eliminarEjercicio, mostrarVistaEjercicio, sustituirEjercicio, onToggle);
                 
-                // Re-configurar drag and drop
-                configurarDragAndDropEjercicios();
+                // Actualizar barra de progreso
+                actualizarBarraProgreso();
                 
                 console.log('Ejercicio sustituido desde la biblioteca');
             } catch (error) {
