@@ -1840,39 +1840,67 @@ async function eliminarEjercicio(ejercicioId, botonElement) {
     }
 }
 
-// Función para toggle del estado completado de un ejercicio
+// Función para toggle del estado completado de un ejercicio (UI Optimista)
 async function toggleCompletado(entrenoId, ejercicioId) {
     try {
-        // Paso 1: Guardar en BD
-        await toggleCompletadoEjercicio(entrenoId, ejercicioId);
+        // Paso 1: Obtener ejercicios actuales de la lista en memoria
+        const ejerciciosActuales = await obtenerEjerciciosDeEntreno(entrenoId);
         
-        // Pequeño delay para asegurar que Firestore haya propagado el cambio
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        // Paso 2: Obtener la lista actualizada con los nuevos estados (CRÍTICO: traer datos frescos)
-        const ejerciciosActualizados = await obtenerEjerciciosDeEntreno(entrenoId);
-        
-        // Verificar que los datos se obtuvieron correctamente
-        if (!ejerciciosActualizados || ejerciciosActualizados.length === 0) {
-            console.warn('No se pudieron obtener los ejercicios actualizados');
+        // Buscar el ejercicio en la lista local
+        const ejercicio = ejerciciosActuales.find(e => e.id === ejercicioId);
+        if (!ejercicio) {
+            console.error('Ejercicio no encontrado en la lista local');
             return;
         }
         
-        // Crear función que capture el entrenoId para el toggle (crucial volver a pasar el ID)
+        // Paso 2: Invertir el estado localmente
+        const fechaHoy = new Date().toDateString();
+        const fechaCompletadoActual = ejercicio.fechaCompletado || null;
+        const nuevoFechaCompletado = fechaCompletadoActual === fechaHoy ? null : fechaHoy;
+        
+        // Actualizar el ejercicio en la lista local
+        ejercicio.fechaCompletado = nuevoFechaCompletado;
+        ejercicio.isCompletedToday = nuevoFechaCompletado === fechaHoy;
+        
+        // Paso 3: Actualizar la UI INMEDIATAMENTE
         const onToggle = (id) => toggleCompletado(entrenoId, id);
+        renderizarListaEjercicios(ejerciciosActuales, null, eliminarEjercicio, mostrarVistaEjercicio, sustituirEjercicio, onToggle);
         
-        // Paso 3: Volver a pintar todo para que los items se muevan a sus secciones correctas
-        renderizarListaEjercicios(ejerciciosActualizados, null, eliminarEjercicio, mostrarVistaEjercicio, sustituirEjercicio, onToggle);
-        
-        // Paso 4: Re-configurar drag and drop
+        // Re-configurar drag and drop
         configurarDragAndDropEjercicios();
         
-        // Paso 5: Actualizar barra de progreso si existe
+        // Actualizar barra de progreso si existe
         if (typeof actualizarBarraProgreso === 'function') {
             actualizarBarraProgreso();
         }
+        
+        // Paso 4: Enviar a Firebase (sin await bloqueante)
+        toggleCompletadoEjercicio(entrenoId, ejercicioId).catch(error => {
+            // Si Firebase falla, revertir el cambio local
+            console.error('Error al toggle completado en Firebase:', error);
+            
+            // Revertir el cambio
+            ejercicio.fechaCompletado = fechaCompletadoActual;
+            ejercicio.isCompletedToday = fechaCompletadoActual === fechaHoy;
+            
+            // Volver a pintar con el estado original
+            renderizarListaEjercicios(ejerciciosActuales, null, eliminarEjercicio, mostrarVistaEjercicio, sustituirEjercicio, onToggle);
+            configurarDragAndDropEjercicios();
+            
+            // Mostrar error al usuario
+            if (typeof showInfoModal === 'function') {
+                showInfoModal('Error', 'No se pudo actualizar el estado. Por favor, intenta de nuevo.');
+            } else {
+                alert('Error al actualizar el estado. Por favor, intenta de nuevo.');
+            }
+        });
     } catch (error) {
         console.error('Error al toggle completado:', error);
+        if (typeof showInfoModal === 'function') {
+            showInfoModal('Error', 'Error al actualizar el estado. Por favor, intenta de nuevo.');
+        } else {
+            alert('Error al actualizar el estado. Por favor, intenta de nuevo.');
+        }
     }
 }
 
