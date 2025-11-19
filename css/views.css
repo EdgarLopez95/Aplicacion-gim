@@ -17,7 +17,8 @@
     gap: 16px;
 }
 
-#entreno-titulo {
+#entreno-titulo,
+#categoria-ejercicios-titulo {
     color: var(--text-primary);
     font-size: 28px;
     font-family: var(--font-title-main);
@@ -25,6 +26,72 @@
     text-transform: uppercase;
     letter-spacing: 1px;
     margin: 0;
+}
+
+/* Sección de completados */
+.section-title.completados-title {
+    color: var(--accent-color);
+    font-size: 20px;
+    font-family: var(--font-title-main);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-top: 32px;
+    margin-bottom: 16px;
+    padding-top: 16px;
+    border-top: 2px solid rgba(223, 255, 0, 0.2);
+}
+
+/* Tarjetas completadas */
+.ejercicio-card.card-completed {
+    opacity: 0.6;
+    filter: grayscale(100%);
+    background-color: #1a1a1a;
+}
+
+/* Placeholder para drag handle en ejercicios completados */
+.drag-placeholder {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    height: 20px;
+    /* Mantiene el espacio visual pero sin funcionalidad de arrastre */
+}
+
+/* Breadcrumbs */
+.breadcrumbs-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+
+.breadcrumbs-container .breadcrumb-item {
+    color: var(--text-secondary);
+    font-size: 14px;
+    text-decoration: none;
+    transition: color 0.2s ease;
+}
+
+.breadcrumbs-container .breadcrumb-item:hover {
+    color: var(--accent-color);
+    cursor: pointer;
+}
+
+.breadcrumbs-container .breadcrumb-item:last-child {
+    color: var(--text-primary);
+    font-weight: 600;
+    cursor: default;
+}
+
+.breadcrumbs-container .breadcrumb-item:last-child:hover {
+    color: var(--text-primary);
+}
+
+.breadcrumbs-container .breadcrumb-separator {
+    color: var(--text-secondary);
+    font-size: 14px;
+    margin: 0 4px;
 }
 
 .lista-ejercicios {
@@ -39,7 +106,8 @@
 
 /* Responsive - Tablet y Desktop */
 @media (min-width: 768px) {
-    #entreno-titulo {
+    #entreno-titulo,
+    #categoria-ejercicios-titulo {
         font-size: 36px;
     }
 

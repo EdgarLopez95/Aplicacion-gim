@@ -175,6 +175,7 @@ async function eliminarImagenDeStorage(imageUrl) {
 
 // Función para obtener ejercicios de un entreno específico
 // entrenoId puede ser el ID numérico o el firestoreId. Si es numérico, lo convertimos.
+// Esta función ahora lee los datos "vivos" desde la biblioteca y combina con datos del entreno
 export async function obtenerEjerciciosDeEntreno(entrenoId) {
     try {
         // Si entrenoId es numérico, necesitamos obtener el firestoreId primero
@@ -194,17 +195,90 @@ export async function obtenerEjerciciosDeEntreno(entrenoId) {
         const snapshot = await getDocs(q);
         
         const ejercicios = [];
-        snapshot.forEach(docSnapshot => {
+        
+        // Procesar cada ejercicio del entreno
+        for (const docSnapshot of snapshot.docs) {
             const data = docSnapshot.data();
-            ejercicios.push({
-                id: data.id,
-                nombre: data.nombre,
-                imagenUrl: data.imagenUrl,
-                // Mantener compatibilidad con código existente que usa imagenBase64
-                imagenBase64: data.imagenUrl,
-                registros: data.registros || []
-            });
-        });
+            const ejercicioEntreno = {
+                id: data.id, // ID del ejercicio en el entreno (mantiene posición)
+                registros: data.registros || [],
+                bibliotecaId: data.bibliotecaId || null,
+                categoriaId: data.categoriaId || null,
+                fechaCompletado: data.fechaCompletado || null
+            };
+            
+            // Si tiene bibliotecaId, leer datos desde la biblioteca
+            if (ejercicioEntreno.bibliotecaId && ejercicioEntreno.categoriaId) {
+                try {
+                    const ejercicioBibliotecaRef = doc(db, `categoriasMusculares/${ejercicioEntreno.categoriaId}/ejercicios`, ejercicioEntreno.bibliotecaId);
+                    const ejercicioBibliotecaDoc = await getDoc(ejercicioBibliotecaRef);
+                    
+                    if (ejercicioBibliotecaDoc.exists()) {
+                        const dataBiblioteca = ejercicioBibliotecaDoc.data();
+                        // Combinar: nombre e imagenUrl de la biblioteca, pero registros y orden del entreno
+                        const fechaCompletado = ejercicioEntreno.fechaCompletado || null;
+                        const fechaHoy = new Date().toDateString();
+                        ejercicios.push({
+                            id: ejercicioEntreno.id,
+                            nombre: dataBiblioteca.nombre,
+                            imagenUrl: dataBiblioteca.imagenUrl || null,
+                            imagenBase64: dataBiblioteca.imagenUrl || null, // Compatibilidad
+                            registros: ejercicioEntreno.registros, // Registros del entreno (pueden estar desactualizados, se sincronizan al escribir)
+                            bibliotecaId: ejercicioEntreno.bibliotecaId,
+                            categoriaId: ejercicioEntreno.categoriaId,
+                            fechaCompletado: fechaCompletado,
+                            isCompletedToday: fechaCompletado === fechaHoy // Propiedad virtual
+                        });
+                    } else {
+                        // Si no existe en la biblioteca, usar datos del entreno como fallback
+                        const fechaCompletado = ejercicioEntreno.fechaCompletado || null;
+                        const fechaHoy = new Date().toDateString();
+                        ejercicios.push({
+                            id: ejercicioEntreno.id,
+                            nombre: data.nombre || 'Ejercicio no encontrado',
+                            imagenUrl: data.imagenUrl || null,
+                            imagenBase64: data.imagenUrl || null,
+                            registros: ejercicioEntreno.registros,
+                            bibliotecaId: ejercicioEntreno.bibliotecaId,
+                            categoriaId: ejercicioEntreno.categoriaId,
+                            fechaCompletado: fechaCompletado,
+                            isCompletedToday: fechaCompletado === fechaHoy
+                        });
+                    }
+                } catch (error) {
+                    console.error(`Error al obtener ejercicio ${ejercicioEntreno.bibliotecaId} de la biblioteca:`, error);
+                    // Fallback: usar datos del entreno
+                    const fechaCompletado = ejercicioEntreno.fechaCompletado || null;
+                    const fechaHoy = new Date().toDateString();
+                    ejercicios.push({
+                        id: ejercicioEntreno.id,
+                        nombre: data.nombre || 'Error al cargar',
+                        imagenUrl: data.imagenUrl || null,
+                        imagenBase64: data.imagenUrl || null,
+                        registros: ejercicioEntreno.registros,
+                        bibliotecaId: ejercicioEntreno.bibliotecaId,
+                        categoriaId: ejercicioEntreno.categoriaId,
+                        fechaCompletado: fechaCompletado,
+                        isCompletedToday: fechaCompletado === fechaHoy
+                    });
+                }
+            } else {
+                // Ejercicio viejo sin bibliotecaId (creado manualmente), devolver tal cual
+                const fechaCompletado = data.fechaCompletado || null;
+                const fechaHoy = new Date().toDateString();
+                ejercicios.push({
+                    id: data.id,
+                    nombre: data.nombre,
+                    imagenUrl: data.imagenUrl,
+                    imagenBase64: data.imagenUrl,
+                    registros: data.registros || [],
+                    bibliotecaId: null,
+                    categoriaId: null,
+                    fechaCompletado: fechaCompletado,
+                    isCompletedToday: fechaCompletado === fechaHoy
+                });
+            }
+        }
         
         return ejercicios;
     } catch (error) {
@@ -249,21 +323,84 @@ export async function agregarEjercicioAEntreno(entrenoId, ejercicio) {
             imagenUrl = ejercicio.imagenUrl;
         }
         
+        // Inicializar registros: si el ejercicio viene de la biblioteca, buscar su historial
+        let registrosIniciales = ejercicio.registros || [];
+        
+        // Si el ejercicio viene de la biblioteca (tiene IDs), buscamos su historial
+        if (ejercicio.bibliotecaId && ejercicio.categoriaId) {
+            try {
+                const docRef = doc(db, 'categoriasMusculares', ejercicio.categoriaId, 'ejercicios', ejercicio.bibliotecaId);
+                const docSnap = await getDoc(docRef);
+                if (docSnap.exists() && docSnap.data().registros) {
+                    registrosIniciales = docSnap.data().registros;
+                    console.log('Historial importado de la biblioteca:', registrosIniciales.length, 'registros');
+                }
+            } catch (error) {
+                console.warn('No se pudo recuperar el historial antiguo:', error);
+                // Continuar con los registros que vengan en el objeto ejercicio o array vacío
+            }
+        }
+        
         // Preparar datos del ejercicio para Firestore
         const ejercicioData = {
             id: ejercicio.id,
             nombre: ejercicio.nombre,
             imagenUrl: imagenUrl,
-            registros: ejercicio.registros || []
+            registros: registrosIniciales,
+            // Guardar referencia al ID original de la biblioteca si existe
+            bibliotecaId: ejercicio.bibliotecaId || null,
+            categoriaId: ejercicio.categoriaId || null
         };
         
         // Agregar a Firestore usando el firestoreId
         const ejerciciosCollection = collection(db, `entrenos/${firestoreId}/ejercicios`);
         await addDoc(ejerciciosCollection, ejercicioData);
         
-        console.log('Ejercicio agregado a Firestore');
+        console.log('Ejercicio agregado a Firestore con historial importado');
     } catch (error) {
         console.error('Error al agregar ejercicio a Firestore:', error);
+        throw error;
+    }
+}
+
+// Función para toggle del estado completado de un ejercicio
+export async function toggleCompletadoEjercicio(entrenoId, ejercicioId) {
+    try {
+        // Obtener el firestoreId del entreno
+        const firestoreId = await obtenerFirestoreIdDeEntreno(entrenoId);
+        
+        // Buscar el documento en Firestore
+        const ejerciciosCollection = collection(db, `entrenos/${firestoreId}/ejercicios`);
+        const snapshot = await getDocs(ejerciciosCollection);
+        
+        let docId = null;
+        let ejercicioExistente = null;
+        snapshot.forEach(docSnapshot => {
+            if (docSnapshot.data().id === ejercicioId) {
+                docId = docSnapshot.id;
+                ejercicioExistente = docSnapshot.data();
+            }
+        });
+        
+        if (!docId) {
+            throw new Error('Ejercicio no encontrado');
+        }
+        
+        // Determinar el nuevo valor de fechaCompletado
+        const fechaHoy = new Date().toDateString();
+        const fechaCompletadoActual = ejercicioExistente.fechaCompletado || null;
+        const nuevoFechaCompletado = fechaCompletadoActual === fechaHoy ? null : fechaHoy;
+        
+        // Actualizar el documento
+        const ejercicioRef = doc(db, `entrenos/${firestoreId}/ejercicios/${docId}`);
+        await updateDoc(ejercicioRef, {
+            fechaCompletado: nuevoFechaCompletado
+        });
+        
+        console.log('Estado completado actualizado:', nuevoFechaCompletado);
+        return nuevoFechaCompletado !== null;
+    } catch (error) {
+        console.error('Error al toggle completado:', error);
         throw error;
     }
 }
@@ -273,20 +410,6 @@ export async function eliminarEjercicioDeEntreno(entrenoId, ejercicioId) {
     try {
         // Obtener el firestoreId del entreno
         const firestoreId = await obtenerFirestoreIdDeEntreno(entrenoId);
-        
-        // Primero obtener el ejercicio para eliminar su imagen
-        const ejercicio = await obtenerEjercicio(entrenoId, ejercicioId);
-        
-        // Intentar eliminar la imagen si existe (no crítico si falla)
-        if (ejercicio && ejercicio.imagenUrl) {
-            try {
-                await eliminarImagenDeStorage(ejercicio.imagenUrl);
-            } catch (error) {
-                // Si la eliminación de la imagen falla, solo registrar una advertencia
-                // pero continuar con la eliminación del ejercicio
-                console.warn('La imagen no se pudo eliminar, pero el ejercicio se eliminará:', error);
-            }
-        }
         
         // Buscar el documento en Firestore
         const ejerciciosCollection = collection(db, `entrenos/${firestoreId}/ejercicios`);
@@ -301,12 +424,17 @@ export async function eliminarEjercicioDeEntreno(entrenoId, ejercicioId) {
         
         if (docId) {
             await deleteDoc(doc(db, `entrenos/${firestoreId}/ejercicios/${docId}`));
-            console.log('Ejercicio eliminado de Firestore');
+            console.log('Ejercicio eliminado del entreno en Firestore');
         } else {
             throw new Error('Ejercicio no encontrado en Firestore');
         }
+        
+        // NOTA: NO eliminamos la imagen de Storage aquí porque:
+        // 1. La imagen pertenece a la BIBLIOTECA, no al entreno
+        // 2. El ejercicio puede estar en otros entrenos
+        // 3. La imagen solo debe eliminarse cuando se elimina PERMANENTEMENTE de la biblioteca
     } catch (error) {
-        console.error('Error al eliminar ejercicio de Firestore:', error);
+        console.error('Error al eliminar ejercicio del entreno:', error);
         throw error;
     }
 }
@@ -372,6 +500,74 @@ export async function actualizarEjercicioEnEntreno(entrenoId, ejercicioActualiza
     }
 }
 
+// Función para sustituir un ejercicio en un entreno
+export async function sustituirEjercicioEnEntreno(entrenoId, ejercicioIdOriginal, nuevoEjercicioBibliotecaId, nuevoEjercicioCategoriaId) {
+    try {
+        // Obtener el firestoreId del entreno
+        const firestoreId = await obtenerFirestoreIdDeEntreno(entrenoId);
+        
+        // Obtener el ejercicio original para mantener su posición
+        const ejercicioOriginal = await obtenerEjercicio(entrenoId, ejercicioIdOriginal);
+        if (!ejercicioOriginal) {
+            throw new Error('Ejercicio original no encontrado');
+        }
+        
+        // Obtener los datos del nuevo ejercicio desde la biblioteca
+        const ejerciciosBiblioteca = await obtenerEjerciciosDeCategoria(nuevoEjercicioCategoriaId);
+        const nuevoEjercicio = ejerciciosBiblioteca.find(ej => ej.id === nuevoEjercicioBibliotecaId);
+        
+        if (!nuevoEjercicio) {
+            throw new Error('Nuevo ejercicio no encontrado en la biblioteca');
+        }
+        
+        // Obtener los registros del ejercicio de la biblioteca
+        let registrosDelEjercicio = [];
+        try {
+            const ejercicioBibliotecaRef = doc(db, `categoriasMusculares/${nuevoEjercicioCategoriaId}/ejercicios`, nuevoEjercicioBibliotecaId);
+            const ejercicioBibliotecaDoc = await getDoc(ejercicioBibliotecaRef);
+            if (ejercicioBibliotecaDoc.exists()) {
+                const data = ejercicioBibliotecaDoc.data();
+                registrosDelEjercicio = data.registros || [];
+            }
+        } catch (error) {
+            console.error('Error al obtener registros de la biblioteca:', error);
+            // Continuar con array vacío si falla
+        }
+        
+        // Buscar el documento en Firestore del ejercicio original
+        const ejerciciosCollection = collection(db, `entrenos/${firestoreId}/ejercicios`);
+        const snapshot = await getDocs(ejerciciosCollection);
+        
+        let docId = null;
+        snapshot.forEach(docSnapshot => {
+            if (docSnapshot.data().id === ejercicioIdOriginal) {
+                docId = docSnapshot.id;
+            }
+        });
+        
+        if (!docId) {
+            throw new Error('Ejercicio no encontrado en Firestore');
+        }
+        
+        // Actualizar el ejercicio manteniendo su ID y posición, pero cambiando los datos
+        // IMPORTANTE: Recuperar los registros del ejercicio de la biblioteca
+        const ejercicioRef = doc(db, `entrenos/${firestoreId}/ejercicios/${docId}`);
+        await updateDoc(ejercicioRef, {
+            nombre: nuevoEjercicio.nombre,
+            imagenUrl: nuevoEjercicio.imagenUrl,
+            bibliotecaId: nuevoEjercicioBibliotecaId,
+            categoriaId: nuevoEjercicioCategoriaId,
+            registros: registrosDelEjercicio // Recuperar registros de la biblioteca
+            // NO actualizar: id (se mantiene para preservar posición)
+        });
+        
+        console.log('Ejercicio sustituido en Firestore');
+    } catch (error) {
+        console.error('Error al sustituir ejercicio en Firestore:', error);
+        throw error;
+    }
+}
+
 // Función para obtener un ejercicio específico
 export async function obtenerEjercicio(entrenoId, ejercicioId) {
     try {
@@ -411,6 +607,20 @@ export async function agregarRegistroAEjercicio(entrenoId, ejercicioId, nuevoReg
         
         await actualizarEjercicioEnEntreno(entrenoId, ejercicioActualizado);
         
+        // Sincronizar con la biblioteca si el ejercicio tiene bibliotecaId
+        if (ejercicio.bibliotecaId && ejercicio.categoriaId) {
+            try {
+                const ejercicioBibliotecaRef = doc(db, `categoriasMusculares/${ejercicio.categoriaId}/ejercicios`, ejercicio.bibliotecaId);
+                await updateDoc(ejercicioBibliotecaRef, {
+                    registros: registros
+                });
+                console.log('Registro sincronizado con la biblioteca');
+            } catch (error) {
+                console.error('Error al sincronizar registro con la biblioteca:', error);
+                // No lanzar error - permitir que continúe aunque falle la sincronización
+            }
+        }
+        
         return true;
     } catch (error) {
         console.error('Error al agregar registro:', error);
@@ -440,6 +650,20 @@ export async function eliminarRegistroDeEjercicio(entrenoId, ejercicioId, regist
         };
         
         await actualizarEjercicioEnEntreno(entrenoId, ejercicioActualizado);
+        
+        // Sincronizar con la biblioteca si el ejercicio tiene bibliotecaId
+        if (ejercicio.bibliotecaId && ejercicio.categoriaId) {
+            try {
+                const ejercicioBibliotecaRef = doc(db, `categoriasMusculares/${ejercicio.categoriaId}/ejercicios`, ejercicio.bibliotecaId);
+                await updateDoc(ejercicioBibliotecaRef, {
+                    registros: registros
+                });
+                console.log('Registro eliminado sincronizado con la biblioteca');
+            } catch (error) {
+                console.error('Error al sincronizar eliminación con la biblioteca:', error);
+                // No lanzar error - permitir que continúe aunque falle la sincronización
+            }
+        }
         
         return true;
     } catch (error) {
@@ -479,6 +703,20 @@ export async function actualizarRegistroEnEjercicio(entrenoId, ejercicioId, regi
         };
         
         await actualizarEjercicioEnEntreno(entrenoId, ejercicioActualizado);
+        
+        // Sincronizar con la biblioteca si el ejercicio tiene bibliotecaId
+        if (ejercicio.bibliotecaId && ejercicio.categoriaId) {
+            try {
+                const ejercicioBibliotecaRef = doc(db, `categoriasMusculares/${ejercicio.categoriaId}/ejercicios`, ejercicio.bibliotecaId);
+                await updateDoc(ejercicioBibliotecaRef, {
+                    registros: registros
+                });
+                console.log('Registro actualizado sincronizado con la biblioteca');
+            } catch (error) {
+                console.error('Error al sincronizar actualización con la biblioteca:', error);
+                // No lanzar error - permitir que continúe aunque falle la sincronización
+            }
+        }
         
         return true;
     } catch (error) {
@@ -557,4 +795,501 @@ export async function convertirImagenABase64(file) {
     
     // Devolver el archivo directamente (ya no convertimos a Base64)
     return file;
+}
+
+// ========== CATEGORÍAS MUSCULARES ==========
+
+// Función para agregar una categoría muscular
+export async function agregarCategoria(nombreCategoria) {
+    try {
+        const categoriasCollection = collection(db, 'categoriasMusculares');
+        
+        // Preparar los datos para guardar
+        const datosParaGuardar = {
+            nombre: nombreCategoria.trim(),
+            fechaCreacion: new Date().toISOString()
+        };
+        
+        // Agregar el documento a Firestore
+        const docRef = await addDoc(categoriasCollection, datosParaGuardar);
+        
+        console.log('Categoría agregada:', docRef.id);
+        return docRef.id;
+    } catch (error) {
+        console.error('Error al agregar categoría:', error);
+        throw error;
+    }
+}
+
+// Función para obtener todas las categorías musculares
+export async function obtenerCategorias() {
+    try {
+        const categoriasCollection = collection(db, 'categoriasMusculares');
+        const q = query(categoriasCollection, orderBy('fechaCreacion', 'asc'));
+        const snapshot = await getDocs(q);
+        
+        if (snapshot.empty) {
+            return [];
+        }
+        
+        const categorias = [];
+        snapshot.forEach(docSnapshot => {
+            categorias.push({
+                id: docSnapshot.id, // ID del documento de Firestore
+                nombre: docSnapshot.data().nombre,
+                fechaCreacion: docSnapshot.data().fechaCreacion
+            });
+        });
+        
+        return categorias;
+    } catch (error) {
+        console.error('Error al obtener categorías:', error);
+        throw error;
+    }
+}
+
+// Función para editar una categoría muscular
+export async function editarCategoria(id, nuevoNombre) {
+    try {
+        const categoriaRef = doc(db, 'categoriasMusculares', id);
+        
+        // Actualizar el documento
+        await updateDoc(categoriaRef, {
+            nombre: nuevoNombre.trim()
+        });
+        
+        console.log('Categoría actualizada:', id);
+    } catch (error) {
+        console.error('Error al editar categoría:', error);
+        throw error;
+    }
+}
+
+// Función para eliminar una categoría muscular
+export async function eliminarCategoria(id) {
+    try {
+        const categoriaRef = doc(db, 'categoriasMusculares', id);
+        
+        // Eliminar el documento de Firestore
+        await deleteDoc(categoriaRef);
+        
+        console.log('Categoría eliminada:', id);
+    } catch (error) {
+        console.error('Error al eliminar categoría:', error);
+        throw error;
+    }
+}
+
+// Función para subir imagen de ejercicio de categoría a Firebase Storage
+async function subirImagenEjercicioCategoriaAStorage(categoriaId, ejercicioId, archivo) {
+    try {
+        // Validar tamaño del archivo (máximo 5MB)
+        const maxSize = 5 * 1024 * 1024; // 5MB
+        if (archivo.size > maxSize) {
+            throw new Error('La imagen es demasiado grande. Por favor, selecciona una imagen menor a 5MB.');
+        }
+        
+        // Crear referencia en Storage
+        const fileName = `categoria_${categoriaId}_${ejercicioId}_${Date.now()}_${archivo.name}`;
+        const storageRef = ref(storage, `images/categorias/${categoriaId}/${fileName}`);
+        
+        // Subir el archivo
+        await uploadBytes(storageRef, archivo);
+        
+        // Obtener la URL de descarga
+        const downloadURL = await getDownloadURL(storageRef);
+        
+        return downloadURL;
+    } catch (error) {
+        console.error('Error al subir imagen de ejercicio de categoría a Storage:', error);
+        throw error;
+    }
+}
+
+// Función para agregar un ejercicio a una categoría
+export async function agregarEjercicioACategoria(categoriaId, ejercicioData) {
+    try {
+        const categoriaRef = doc(db, 'categoriasMusculares', categoriaId);
+        const ejerciciosCollection = collection(categoriaRef, 'ejercicios');
+        
+        // Si hay un archivo de imagen, subirlo primero
+        let imagenUrl = ejercicioData.imagenUrl || null;
+        if (ejercicioData.archivoImagen) {
+            // Generar un ID temporal para el nombre del archivo
+            const tempId = Date.now().toString();
+            imagenUrl = await subirImagenEjercicioCategoriaAStorage(categoriaId, tempId, ejercicioData.archivoImagen);
+        }
+        
+        // Preparar los datos para guardar
+        const datosParaGuardar = {
+            nombre: ejercicioData.nombre.trim(),
+            imagenUrl: imagenUrl,
+            fechaCreacion: new Date().toISOString()
+        };
+        
+        // Agregar el documento a la subcolección
+        const docRef = await addDoc(ejerciciosCollection, datosParaGuardar);
+        
+        console.log('Ejercicio agregado a la categoría:', docRef.id);
+        return docRef.id;
+    } catch (error) {
+        console.error('Error al agregar ejercicio a la categoría:', error);
+        throw error;
+    }
+}
+
+// Función para obtener todos los ejercicios de una categoría
+export async function obtenerEjerciciosDeCategoria(categoriaId) {
+    try {
+        const categoriaRef = doc(db, 'categoriasMusculares', categoriaId);
+        const ejerciciosCollection = collection(categoriaRef, 'ejercicios');
+        const q = query(ejerciciosCollection, orderBy('fechaCreacion', 'asc'));
+        const snapshot = await getDocs(q);
+        
+        if (snapshot.empty) {
+            return [];
+        }
+        
+        const ejercicios = [];
+        snapshot.forEach(docSnapshot => {
+            const data = docSnapshot.data();
+            ejercicios.push({
+                id: docSnapshot.id, // ID del documento de Firestore
+                nombre: data.nombre,
+                imagenUrl: data.imagenUrl || null,
+                fechaCreacion: data.fechaCreacion,
+                registros: data.registros || [] // Incluir registros del ejercicio
+            });
+        });
+        
+        return ejercicios;
+    } catch (error) {
+        console.error('Error al obtener ejercicios de la categoría:', error);
+        throw error;
+    }
+}
+
+// Función para obtener todos los ejercicios de todas las categorías (para el modal de selección)
+export async function obtenerTodosLosEjerciciosDeBiblioteca() {
+    try {
+        const categorias = await obtenerCategorias();
+        const ejerciciosPorCategoria = [];
+        
+        for (const categoria of categorias) {
+            const ejercicios = await obtenerEjerciciosDeCategoria(categoria.id);
+            if (ejercicios.length > 0) {
+                ejerciciosPorCategoria.push({
+                    categoria: {
+                        id: categoria.id,
+                        nombre: categoria.nombre
+                    },
+                    ejercicios: ejercicios.map(ej => ({
+                        ...ej,
+                        categoriaId: categoria.id,
+                        bibliotecaId: ej.id // ID original en la biblioteca
+                    }))
+                });
+            }
+        }
+        
+        return ejerciciosPorCategoria;
+    } catch (error) {
+        console.error('Error al obtener todos los ejercicios de la biblioteca:', error);
+        throw error;
+    }
+}
+
+// Función para editar un ejercicio de una categoría
+export async function editarEjercicioDeCategoria(categoriaId, ejercicioId, ejercicioData) {
+    try {
+        const ejercicioRef = doc(db, `categoriasMusculares/${categoriaId}/ejercicios/${ejercicioId}`);
+        
+        // Obtener el ejercicio existente para mantener la imagen si no se cambia
+        const ejercicioSnapshot = await getDocs(collection(db, `categoriasMusculares/${categoriaId}/ejercicios`));
+        let ejercicioExistente = null;
+        ejercicioSnapshot.forEach(docSnapshot => {
+            if (docSnapshot.id === ejercicioId) {
+                ejercicioExistente = docSnapshot.data();
+            }
+        });
+        
+        if (!ejercicioExistente) {
+            throw new Error('Ejercicio no encontrado');
+        }
+        
+        let imagenUrl = ejercicioExistente.imagenUrl;
+        
+        // Si hay una nueva imagen (archivo), subirla y eliminar la antigua
+        if (ejercicioData.archivoImagen && ejercicioData.archivoImagen instanceof File) {
+            // Eliminar imagen antigua
+            if (ejercicioExistente.imagenUrl) {
+                await eliminarImagenDeStorage(ejercicioExistente.imagenUrl);
+            }
+            
+            // Subir nueva imagen
+            imagenUrl = await subirImagenEjercicioCategoriaAStorage(categoriaId, ejercicioId, ejercicioData.archivoImagen);
+        } else if (ejercicioData.imagenUrl) {
+            imagenUrl = ejercicioData.imagenUrl;
+        }
+        
+        // Actualizar en Firestore
+        await updateDoc(ejercicioRef, {
+            nombre: ejercicioData.nombre.trim(),
+            imagenUrl: imagenUrl
+        });
+        
+        console.log('Ejercicio de categoría actualizado:', ejercicioId);
+    } catch (error) {
+        console.error('Error al editar ejercicio de categoría:', error);
+        throw error;
+    }
+}
+
+// Función para eliminar un ejercicio de una categoría
+export async function eliminarEjercicioDeCategoria(categoriaId, ejercicioId) {
+    try {
+        // Obtener el ejercicio para eliminar su imagen
+        const ejercicioRef = doc(db, `categoriasMusculares/${categoriaId}/ejercicios/${ejercicioId}`);
+        const ejercicioSnapshot = await getDocs(collection(db, `categoriasMusculares/${categoriaId}/ejercicios`));
+        
+        let imagenUrl = null;
+        ejercicioSnapshot.forEach(docSnapshot => {
+            if (docSnapshot.id === ejercicioId) {
+                const data = docSnapshot.data();
+                imagenUrl = data.imagenUrl;
+            }
+        });
+        
+        // Eliminar la imagen de Storage si existe
+        if (imagenUrl) {
+            try {
+                await eliminarImagenDeStorage(imagenUrl);
+            } catch (error) {
+                // Si la imagen no se encuentra, no es un error fatal
+                if (error.code !== 'storage/object-not-found') {
+                    console.warn('Error al eliminar imagen de Storage (pero el ejercicio se eliminará):', error);
+                } else {
+                    console.warn('La imagen no se encontró en Storage, pero el ejercicio se eliminará.');
+                }
+            }
+        }
+        
+        // Eliminar el documento de Firestore
+        await deleteDoc(ejercicioRef);
+        
+        console.log('Ejercicio de categoría eliminado:', ejercicioId);
+    } catch (error) {
+        console.error('Error al eliminar ejercicio de categoría:', error);
+        throw error;
+    }
+}
+
+// Función para reordenar ejercicios de una categoría
+export async function reordenarEjerciciosDeCategoria(categoriaId, draggedId, targetId) {
+    try {
+        const ejercicios = await obtenerEjerciciosDeCategoria(categoriaId);
+        
+        // Encontrar los índices de los ejercicios
+        const draggedIndex = ejercicios.findIndex(e => e.id === draggedId);
+        const targetIndex = ejercicios.findIndex(e => e.id === targetId);
+        
+        if (draggedIndex === -1 || targetIndex === -1) {
+            return false;
+        }
+        
+        // Si son el mismo, no hacer nada
+        if (draggedIndex === targetIndex) {
+            return true;
+        }
+        
+        // Remover el ejercicio arrastrado del array
+        const [ejercicioArrastrado] = ejercicios.splice(draggedIndex, 1);
+        
+        // Insertar el ejercicio arrastrado en la nueva posición
+        ejercicios.splice(targetIndex, 0, ejercicioArrastrado);
+        
+        // Actualizar el orden en Firestore
+        // Necesitamos actualizar cada ejercicio con un campo de orden
+        // Por ahora, simplemente re-guardamos todos los ejercicios en el nuevo orden
+        const ejerciciosCollection = collection(db, `categoriasMusculares/${categoriaId}/ejercicios`);
+        const snapshot = await getDocs(ejerciciosCollection);
+        
+        // Eliminar todos los ejercicios
+        const deletePromises = snapshot.docs.map(docSnapshot => 
+            deleteDoc(doc(db, `categoriasMusculares/${categoriaId}/ejercicios/${docSnapshot.id}`))
+        );
+        await Promise.all(deletePromises);
+        
+        // Agregar todos los ejercicios en el nuevo orden
+        const addPromises = ejercicios.map(ejercicio => {
+            const ejercicioData = {
+                nombre: ejercicio.nombre,
+                imagenUrl: ejercicio.imagenUrl,
+                fechaCreacion: ejercicio.fechaCreacion // Mantener la fecha original
+            };
+            return addDoc(ejerciciosCollection, ejercicioData);
+        });
+        await Promise.all(addPromises);
+        
+        return true;
+    } catch (error) {
+        console.error('Error al reordenar ejercicios de categoría:', error);
+        throw error;
+    }
+}
+
+// ========== BIBLIOTECA DE EJERCICIOS ==========
+
+// Función para subir imagen de biblioteca a Firebase Storage
+async function subirImagenBibliotecaAStorage(ejercicioId, archivo) {
+    try {
+        // Validar tamaño del archivo (máximo 5MB)
+        const maxSize = 5 * 1024 * 1024; // 5MB
+        if (archivo.size > maxSize) {
+            throw new Error('La imagen es demasiado grande. Por favor, selecciona una imagen menor a 5MB.');
+        }
+        
+        // Crear referencia en Storage
+        const fileName = `biblioteca_${ejercicioId}_${Date.now()}_${archivo.name}`;
+        const storageRef = ref(storage, `images/biblioteca/${fileName}`);
+        
+        // Subir el archivo
+        await uploadBytes(storageRef, archivo);
+        
+        // Obtener la URL de descarga
+        const downloadURL = await getDownloadURL(storageRef);
+        
+        return downloadURL;
+    } catch (error) {
+        console.error('Error al subir imagen de biblioteca a Storage:', error);
+        throw error;
+    }
+}
+
+// Función para agregar un ejercicio a la biblioteca
+export async function agregarEjercicioABiblioteca(ejercicioData) {
+    try {
+        const bibliotecaCollection = collection(db, 'bibliotecaEjercicios');
+        
+        // Si hay un archivo de imagen, subirlo primero
+        let imagenUrl = ejercicioData.imagenUrl || null;
+        if (ejercicioData.archivoImagen) {
+            // Generar un ID temporal para el nombre del archivo
+            const tempId = Date.now().toString();
+            imagenUrl = await subirImagenBibliotecaAStorage(tempId, ejercicioData.archivoImagen);
+        }
+        
+        // Preparar los datos para guardar
+        const datosParaGuardar = {
+            nombre: ejercicioData.nombre,
+            etiqueta: ejercicioData.etiqueta || '',
+            imagenUrl: imagenUrl,
+            fechaCreacion: new Date().toISOString()
+        };
+        
+        // Agregar el documento a Firestore
+        const docRef = await addDoc(bibliotecaCollection, datosParaGuardar);
+        
+        console.log('Ejercicio agregado a la biblioteca:', docRef.id);
+        return docRef.id;
+    } catch (error) {
+        console.error('Error al agregar ejercicio a la biblioteca:', error);
+        throw error;
+    }
+}
+
+// Función para obtener todos los ejercicios de la biblioteca
+export async function obtenerEjerciciosBiblioteca() {
+    try {
+        const bibliotecaCollection = collection(db, 'bibliotecaEjercicios');
+        const q = query(bibliotecaCollection, orderBy('fechaCreacion', 'desc'));
+        const snapshot = await getDocs(q);
+        
+        if (snapshot.empty) {
+            return [];
+        }
+        
+        const ejercicios = [];
+        snapshot.forEach(docSnapshot => {
+            ejercicios.push({
+                id: docSnapshot.id, // ID del documento de Firestore
+                nombre: docSnapshot.data().nombre,
+                etiqueta: docSnapshot.data().etiqueta || '',
+                imagenUrl: docSnapshot.data().imagenUrl || null,
+                fechaCreacion: docSnapshot.data().fechaCreacion
+            });
+        });
+        
+        return ejercicios;
+    } catch (error) {
+        console.error('Error al obtener ejercicios de la biblioteca:', error);
+        throw error;
+    }
+}
+
+// Función para editar un ejercicio de la biblioteca
+export async function editarEjercicioBiblioteca(id, data) {
+    try {
+        const ejercicioRef = doc(db, 'bibliotecaEjercicios', id);
+        
+        // Obtener el ejercicio actual para verificar si hay imagen existente
+        const ejercicioDoc = await getDoc(ejercicioRef);
+        if (!ejercicioDoc.exists()) {
+            throw new Error('Ejercicio no encontrado');
+        }
+        
+        const ejercicioActual = ejercicioDoc.data();
+        let imagenUrl = ejercicioActual.imagenUrl || null;
+        
+        // Si hay un nuevo archivo de imagen, subirlo
+        if (data.archivoImagen) {
+            // Si había una imagen anterior, eliminarla
+            if (imagenUrl) {
+                await eliminarImagenDeStorage(imagenUrl);
+            }
+            // Subir la nueva imagen
+            imagenUrl = await subirImagenBibliotecaAStorage(id, data.archivoImagen);
+        }
+        
+        // Preparar los datos para actualizar
+        const datosParaActualizar = {
+            nombre: data.nombre,
+            etiqueta: data.etiqueta || '',
+            imagenUrl: imagenUrl
+        };
+        
+        // Actualizar el documento
+        await updateDoc(ejercicioRef, datosParaActualizar);
+        
+        console.log('Ejercicio de biblioteca actualizado:', id);
+    } catch (error) {
+        console.error('Error al editar ejercicio de la biblioteca:', error);
+        throw error;
+    }
+}
+
+// Función para eliminar un ejercicio de la biblioteca
+export async function eliminarEjercicioBiblioteca(id) {
+    try {
+        const ejercicioRef = doc(db, 'bibliotecaEjercicios', id);
+        
+        // Obtener el ejercicio para eliminar su imagen si existe
+        const ejercicioDoc = await getDoc(ejercicioRef);
+        if (ejercicioDoc.exists()) {
+            const ejercicio = ejercicioDoc.data();
+            
+            // Eliminar la imagen de Storage si existe
+            if (ejercicio.imagenUrl) {
+                await eliminarImagenDeStorage(ejercicio.imagenUrl);
+            }
+        }
+        
+        // Eliminar el documento de Firestore
+        await deleteDoc(ejercicioRef);
+        
+        console.log('Ejercicio de biblioteca eliminado:', id);
+    } catch (error) {
+        console.error('Error al eliminar ejercicio de la biblioteca:', error);
+        throw error;
+    }
 }
