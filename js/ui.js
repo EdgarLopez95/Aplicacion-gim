@@ -283,56 +283,87 @@ export function renderizarListaEjercicios(ejercicios, onEditarClick, onEliminarC
     
     // Función para renderizar una tarjeta de ejercicio
     const renderizarTarjeta = (ejercicio, esCompletado) => {
+        // Verificar si es un ejercicio huérfano
+        const esHuerfano = ejercicio.isOrphan === true;
+        
         const card = document.createElement('div');
-        card.className = 'ejercicio-card' + (esCompletado ? ' card-completed' : '');
-        card.style.cursor = 'pointer';
+        let className = 'ejercicio-card';
+        if (esCompletado) className += ' card-completed';
+        if (esHuerfano) className += ' orphan';
+        card.className = className;
+        card.style.cursor = esHuerfano ? 'default' : 'pointer';
         card.dataset.ejercicioId = ejercicio.id;
         
-        card.innerHTML = `
-            <div class="checkbox-container">
-                <input type="checkbox" class="btn-check" ${ejercicio.isCompletedToday ? 'checked' : ''} data-ejercicio-id="${ejercicio.id}">
-            </div>
-            <div class="ejercicio-card-content">
-                <div class="ejercicio-card-content-wrapper">
-                    <img src="${ejercicio.imagenUrl || ejercicio.imagenBase64}" alt="${ejercicio.nombre}" class="ejercicio-card-image">
-                    <h3 class="ejercicio-card-title">${ejercicio.nombre}</h3>
+        // Si es huérfano, renderizar tarjeta especial
+        if (esHuerfano) {
+            const imagenUrl = ejercicio.imagenUrl || ejercicio.imagenBase64 || './images/favicon.png';
+            card.innerHTML = `
+                <div class="ejercicio-card-content" style="grid-column: 1 / -1;">
+                    <div class="ejercicio-card-content-wrapper">
+                        <img src="${imagenUrl}" alt="${ejercicio.nombre}" class="ejercicio-card-image" style="filter: grayscale(100%); opacity: 0.5;">
+                        <div>
+                            <h3 class="ejercicio-card-title" style="color: var(--text-secondary);">${ejercicio.nombre}</h3>
+                            <p style="color: #dc3545; font-size: 12px; margin-top: 4px;">Ejercicio No Disponible</p>
+                        </div>
+                    </div>
                 </div>
-            </div>
-            <div class="ejercicio-card-actions">
-                <button class="btn-sustituir" data-ejercicio-id="${ejercicio.id}" title="Sustituir">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"></path>
-                    </svg>
-                </button>
-                <button class="btn-eliminar" data-ejercicio-id="${ejercicio.id}" title="Eliminar">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <polyline points="3 6 5 6 21 6"></polyline>
-                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                    </svg>
-                </button>
-            </div>
-        `;
-        
-        // Agregar event listener para hacer clic en la tarjeta (navegar a vista de ejercicio)
-        if (onEjercicioClick) {
-            card.addEventListener('click', function(e) {
-                // No navegar si se hace clic en los botones o checkbox
-                if (!e.target.closest('.ejercicio-card-actions') && 
-                    !e.target.closest('.checkbox-container')) {
-                    onEjercicioClick(ejercicio.id);
-                }
-            });
-        }
-        
-        // Agregar event listener para el checkbox
-        if (onToggleCompletado) {
-            const checkbox = card.querySelector('.btn-check');
-            if (checkbox) {
-                checkbox.addEventListener('change', function(e) {
-                    e.stopPropagation();
-                    const ejercicioId = parseInt(this.dataset.ejercicioId);
-                    onToggleCompletado(ejercicioId);
+                <div class="ejercicio-card-actions" style="grid-column: 3;">
+                    <button class="btn-eliminar" data-ejercicio-id="${ejercicio.id}" title="Eliminar">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
+                    </button>
+                </div>
+            `;
+        } else {
+            // Tarjeta normal
+            card.innerHTML = `
+                <div class="checkbox-container">
+                    <input type="checkbox" class="btn-check" ${ejercicio.isCompletedToday ? 'checked' : ''} data-ejercicio-id="${ejercicio.id}">
+                </div>
+                <div class="ejercicio-card-content">
+                    <div class="ejercicio-card-content-wrapper">
+                        <img src="${ejercicio.imagenUrl || ejercicio.imagenBase64}" alt="${ejercicio.nombre}" class="ejercicio-card-image">
+                        <h3 class="ejercicio-card-title">${ejercicio.nombre}</h3>
+                    </div>
+                </div>
+                <div class="ejercicio-card-actions">
+                    <button class="btn-sustituir" data-ejercicio-id="${ejercicio.id}" title="Sustituir">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"></path>
+                        </svg>
+                    </button>
+                    <button class="btn-eliminar" data-ejercicio-id="${ejercicio.id}" title="Eliminar">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
+                    </button>
+                </div>
+            `;
+            
+            // Agregar event listener para hacer clic en la tarjeta (navegar a vista de ejercicio) - solo si no es huérfano
+            if (onEjercicioClick) {
+                card.addEventListener('click', function(e) {
+                    // No navegar si se hace clic en los botones o checkbox
+                    if (!e.target.closest('.ejercicio-card-actions') && 
+                        !e.target.closest('.checkbox-container')) {
+                        onEjercicioClick(ejercicio.id);
+                    }
                 });
+            }
+            
+            // Agregar event listener para el checkbox - solo si no es huérfano
+            if (onToggleCompletado) {
+                const checkbox = card.querySelector('.btn-check');
+                if (checkbox) {
+                    checkbox.addEventListener('change', function(e) {
+                        e.stopPropagation();
+                        const ejercicioId = parseInt(this.dataset.ejercicioId);
+                        onToggleCompletado(ejercicioId);
+                    });
+                }
             }
         }
         
@@ -495,10 +526,12 @@ export function renderizarListaEjerciciosCategoria(ejercicios, onEditarClick, on
         card.className = 'ejercicio-card library-mode';
         card.dataset.ejercicioId = ejercicio.id;
         
+        const imagenUrl = obtenerImagenSegura(ejercicio.imagenUrl);
+        
         card.innerHTML = `
             <div class="ejercicio-card-content">
                 <div class="ejercicio-card-content-wrapper">
-                    <img src="${obtenerImagenSegura(ejercicio.imagenUrl)}" alt="${ejercicio.nombre}" class="ejercicio-card-image" onerror="this.onerror=null; this.src='./images/favicon.png';">
+                    <img src="${imagenUrl}" alt="${ejercicio.nombre}" class="ejercicio-card-image preview-image" data-image-url="${imagenUrl}" data-image-alt="${ejercicio.nombre}" onerror="this.onerror=null; this.src='./images/favicon.png';" style="cursor: pointer;">
                     <h3 class="ejercicio-card-title">${ejercicio.nombre}</h3>
                 </div>
             </div>
@@ -543,6 +576,44 @@ export function renderizarListaEjerciciosCategoria(ejercicios, onEditarClick, on
             });
         });
     }
+    
+    // Agregar event listeners para previsualización de imágenes
+    const imagenesPreview = listaContainer.querySelectorAll('.preview-image');
+    imagenesPreview.forEach(imagen => {
+        imagen.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const imageUrl = this.dataset.imageUrl;
+            const imageAlt = this.dataset.imageAlt || 'Vista previa';
+            
+            // Mostrar modal de previsualización
+            const modalPreview = document.getElementById('modal-preview');
+            const previewImage = document.getElementById('preview-image');
+            const closePreview = document.getElementById('close-preview');
+            
+            if (modalPreview && previewImage) {
+                previewImage.src = imageUrl;
+                previewImage.alt = imageAlt;
+                modalPreview.style.display = 'flex';
+                modalPreview.classList.add('active');
+                
+                // Cerrar modal al hacer clic en el botón de cerrar
+                if (closePreview) {
+                    closePreview.onclick = function() {
+                        modalPreview.style.display = 'none';
+                        modalPreview.classList.remove('active');
+                    };
+                }
+                
+                // Cerrar modal al hacer clic fuera de la imagen
+                modalPreview.onclick = function(e) {
+                    if (e.target === modalPreview) {
+                        modalPreview.style.display = 'none';
+                        modalPreview.classList.remove('active');
+                    }
+                };
+            }
+        });
+    });
     
     // Actualizar referencias después de renderizar
     actualizarReferenciasDOM();
@@ -664,10 +735,12 @@ export function renderizarListaBiblioteca(ejercicios, onEditarClick, onEliminarC
         card.className = 'ejercicio-card library-mode';
         card.dataset.ejercicioId = ejercicio.id;
         
+        const imagenUrl = obtenerImagenSegura(ejercicio.imagenUrl);
+        
         card.innerHTML = `
             <div class="ejercicio-card-content">
                 <div class="ejercicio-card-content-wrapper">
-                    <img src="${obtenerImagenSegura(ejercicio.imagenUrl)}" alt="${ejercicio.nombre}" class="ejercicio-card-image" onerror="this.onerror=null; this.src='./images/favicon.png';">
+                    <img src="${imagenUrl}" alt="${ejercicio.nombre}" class="ejercicio-card-image preview-image" data-image-url="${imagenUrl}" data-image-alt="${ejercicio.nombre}" onerror="this.onerror=null; this.src='./images/favicon.png';" style="cursor: pointer;">
                     <div>
                         <h3 class="ejercicio-card-title">${ejercicio.nombre}</h3>
                         <p style="color: var(--text-secondary); font-size: 14px; margin-top: 4px;">${ejercicio.etiqueta || 'Sin etiqueta'}</p>
@@ -714,6 +787,44 @@ export function renderizarListaBiblioteca(ejercicios, onEditarClick, onEliminarC
             e.stopPropagation();
             const ejercicioId = this.dataset.ejercicioId;
             onEditarClick(ejercicioId);
+        });
+    });
+    
+    // Agregar event listeners para previsualización de imágenes
+    const imagenesPreview = listaContainer.querySelectorAll('.preview-image');
+    imagenesPreview.forEach(imagen => {
+        imagen.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const imageUrl = this.dataset.imageUrl;
+            const imageAlt = this.dataset.imageAlt || 'Vista previa';
+            
+            // Mostrar modal de previsualización
+            const modalPreview = document.getElementById('modal-preview');
+            const previewImage = document.getElementById('preview-image');
+            const closePreview = document.getElementById('close-preview');
+            
+            if (modalPreview && previewImage) {
+                previewImage.src = imageUrl;
+                previewImage.alt = imageAlt;
+                modalPreview.style.display = 'flex';
+                modalPreview.classList.add('active');
+                
+                // Cerrar modal al hacer clic en el botón de cerrar
+                if (closePreview) {
+                    closePreview.onclick = function() {
+                        modalPreview.style.display = 'none';
+                        modalPreview.classList.remove('active');
+                    };
+                }
+                
+                // Cerrar modal al hacer clic fuera de la imagen
+                modalPreview.onclick = function(e) {
+                    if (e.target === modalPreview) {
+                        modalPreview.style.display = 'none';
+                        modalPreview.classList.remove('active');
+                    }
+                };
+            }
         });
     });
     
@@ -1053,6 +1164,10 @@ export function mostrarModal() {
     if (modalNuevoEjercicio) {
         modalNuevoEjercicio.classList.add('active');
     }
+    // Ocultar botones flotantes cuando se muestra el modal
+    document.querySelectorAll('.btn-anadir, #btn-abrir-modal-registro').forEach(btn => {
+        if (btn) btn.style.display = 'none';
+    });
 }
 
 // Función para ocultar el modal
@@ -1064,6 +1179,11 @@ export function ocultarModal() {
     if (formNuevoEjercicio) {
         formNuevoEjercicio.reset();
     }
+    
+    // Mostrar botones flotantes cuando se oculta el modal
+    document.querySelectorAll('.btn-anadir, #btn-abrir-modal-registro').forEach(btn => {
+        if (btn) btn.style.display = 'flex';
+    });
     
     if (inputImagenEjercicio) {
         // Restaurar el atributo required del input de imagen (por defecto es obligatorio)
@@ -1082,6 +1202,11 @@ export function mostrarModalRegistro() {
     if (modalRegistro) {
         modalRegistro.classList.add('active');
     }
+    
+    // Ocultar botones flotantes cuando se muestra el modal
+    document.querySelectorAll('.btn-anadir, #btn-abrir-modal-registro').forEach(btn => {
+        if (btn) btn.style.display = 'none';
+    });
 }
 
 // Función para ocultar el modal de registro
@@ -1096,6 +1221,11 @@ export function ocultarModalRegistro() {
         formRegistro.reset();
         // Restaurar fecha a hoy
         const fechaInput = formRegistro.querySelector('#fecha-registro');
+    
+    // Mostrar botones flotantes cuando se oculta el modal
+    document.querySelectorAll('.btn-anadir, #btn-abrir-modal-registro').forEach(btn => {
+        if (btn) btn.style.display = 'flex';
+    });
         if (fechaInput) {
             const hoy = new Date().toISOString().split('T')[0];
             fechaInput.value = hoy;
@@ -1378,12 +1508,32 @@ function renderizarTablaHistorial(historial) {
     });
     
     const tarjetas = historialOrdenado.map(medicion => {
-        const fecha = new Date(medicion.fecha);
-        const fechaFormateada = fecha.toLocaleDateString('es-ES', { 
-            day: '2-digit', 
-            month: '2-digit', 
-            year: 'numeric' 
-        });
+        // Manejar fecha como string YYYY-MM-DD o Date
+        let fechaFormateada = '';
+        if (medicion.fecha) {
+            if (typeof medicion.fecha === 'string' && medicion.fecha.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                // Si es string YYYY-MM-DD, parsear manualmente para evitar problemas de timezone
+                const partes = medicion.fecha.split('-');
+                const año = parseInt(partes[0], 10);
+                const mes = parseInt(partes[1], 10) - 1;
+                const dia = parseInt(partes[2], 10);
+                const fecha = new Date(año, mes, dia);
+                fechaFormateada = fecha.toLocaleDateString('es-ES', { 
+                    day: '2-digit', 
+                    month: '2-digit', 
+                    year: 'numeric' 
+                });
+            } else {
+                // Si es Date o ISO string, usar directamente
+                const fecha = new Date(medicion.fecha);
+                fechaFormateada = fecha.toLocaleDateString('es-ES', { 
+                    day: '2-digit', 
+                    month: '2-digit', 
+                    year: 'numeric',
+                    timeZone: 'UTC'
+                });
+            }
+        }
         
         return `
             <div class="historial-card" data-id="${medicion.id}">

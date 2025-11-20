@@ -49,6 +49,19 @@
     background-color: #1a1a1a;
 }
 
+/* Tarjetas huérfanas (ejercicios eliminados de la biblioteca) */
+.ejercicio-card.orphan {
+    border: 2px dashed #dc3545;
+    opacity: 0.7;
+    background-color: rgba(220, 53, 69, 0.1);
+    cursor: default;
+}
+
+.ejercicio-card.orphan:hover {
+    transform: none;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
 
 /* Breadcrumbs */
 .breadcrumbs-container {

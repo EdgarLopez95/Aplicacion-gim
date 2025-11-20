@@ -58,6 +58,14 @@
         </div>
     </div>
 
+    <!-- Modal de previsualización de imagen -->
+    <div id="modal-preview" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 90vw; max-height: 90vh; padding: 0; background: transparent;">
+            <img id="preview-image" src="" alt="Vista previa" style="width: 100%; height: auto; max-height: 90vh; object-fit: contain; border-radius: 12px;">
+            <button id="close-preview" style="position: absolute; top: 16px; right: 16px; background: rgba(0,0,0,0.7); color: white; border: none; border-radius: 50%; width: 40px; height: 40px; font-size: 24px; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 2002;">×</button>
+        </div>
+    </div>
+
     <!-- Floating Tab Bar Navigation -->
     <nav id="tab-bar" class="floating-nav">
         <button class="nav-item active" data-view="dashboard-view">

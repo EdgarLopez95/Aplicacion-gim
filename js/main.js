@@ -40,7 +40,6 @@ import {
     renderizarDashboardView,
     renderizarEntrenoView,
     renderizarListaEjercicios,
-    renderizarEjercicios,
     renderizarEjercicioView,
     renderizarListaRegistros,
     mostrarModal,
@@ -292,8 +291,6 @@ function configurarEventListenersModalSeleccion() {
                 
                 // Actualizar barra de progreso
                 actualizarBarraProgreso();
-                
-                console.log('Ejercicio agregado desde la biblioteca');
             } catch (error) {
                 console.error('Error al agregar ejercicio:', error);
                 alert('Error al agregar el ejercicio al entreno');
@@ -358,7 +355,6 @@ async function manejarSubmitFormulario(e) {
             
             // 2. GUARDAR LOS DATOS
             await actualizarEjercicioEnEntreno(entrenoActual.id, ejercicioActualizado);
-            console.log('Ejercicio actualizado:', ejercicioActualizado);
             
         } else {
             // ESTAMOS CREANDO UN NUEVO EJERCICIO
@@ -385,7 +381,6 @@ async function manejarSubmitFormulario(e) {
             
             // 2. GUARDAR LOS DATOS
             await agregarEjercicioAEntreno(entrenoActual.id, nuevoEjercicio);
-            console.log('Ejercicio agregado:', nuevoEjercicio);
         }
         
         // 3. RENDERIZAR LOS EJERCICIOS (LO MÁS IMPORTANTE)
@@ -1001,8 +996,6 @@ async function manejarGuardarPerfil() {
         
         // Cerrar modal
         ocultarModalPerfil();
-        
-        console.log('Perfil actualizado correctamente');
     } catch (error) {
         console.error('Error al guardar perfil:', error);
         alert('Error al guardar el perfil. Por favor, intenta de nuevo.');
@@ -1088,6 +1081,11 @@ function mostrarModalMedicion() {
     
     modal.style.display = 'flex';
     modal.classList.add('active');
+    
+    // Ocultar botones flotantes cuando se muestra el modal
+    document.querySelectorAll('.btn-anadir, #btn-abrir-modal-registro').forEach(btn => {
+        if (btn) btn.style.display = 'none';
+    });
 }
 
 // Función para mostrar el modal de medición (editar registro)
@@ -1137,6 +1135,11 @@ async function mostrarModalEditarMedicion(id) {
         
         modal.style.display = 'flex';
         modal.classList.add('active');
+        
+        // Ocultar botones flotantes cuando se muestra el modal
+        document.querySelectorAll('.btn-anadir, #btn-abrir-modal-registro').forEach(btn => {
+            if (btn) btn.style.display = 'none';
+        });
     } catch (error) {
         console.error('Error al cargar medición para editar:', error);
         alert('Error al cargar la medición. Por favor, intenta de nuevo.');
@@ -1150,6 +1153,11 @@ function ocultarModalMedicion() {
     
     modal.style.display = 'none';
     modal.classList.remove('active');
+    
+    // Mostrar botones flotantes cuando se oculta el modal
+    document.querySelectorAll('.btn-anadir, #btn-abrir-modal-registro').forEach(btn => {
+        if (btn) btn.style.display = 'flex';
+    });
 }
 
 // Función para manejar el guardado de medición
@@ -1175,9 +1183,13 @@ async function manejarGuardarMedicion() {
         return;
     }
     
-    const boton = form.querySelector('button[type="submit"]');
-    if (boton) {
-        boton.classList.add('is-loading');
+    // Cerrar modal inmediatamente
+    ocultarModalMedicion();
+    
+    // Mostrar spinner global
+    const loader = document.getElementById('global-loader');
+    if (loader) {
+        loader.style.display = 'flex';
     }
     
     try {
@@ -1192,7 +1204,6 @@ async function manejarGuardarMedicion() {
                 agua: agua || null,
                 visceral: visceral || null
             });
-            console.log('Medición actualizada correctamente');
         } else {
             // Crear nueva medición
             await guardarMedicion({
@@ -1203,7 +1214,6 @@ async function manejarGuardarMedicion() {
                 agua: agua || null,
                 visceral: visceral || null
             });
-            console.log('Medición guardada correctamente');
         }
         
         // Resetear estado de edición
@@ -1222,17 +1232,15 @@ async function manejarGuardarMedicion() {
             activeFilterBtn.classList.add('active');
         }
         
-        // Cerrar modal
-        ocultarModalMedicion();
-        
         // Limpiar formulario
         form.reset();
     } catch (error) {
         console.error('Error al guardar medición:', error);
         alert('Error al guardar la medición. Por favor, intenta de nuevo.');
     } finally {
-        if (boton) {
-            boton.classList.remove('is-loading');
+        // Ocultar spinner global
+        if (loader) {
+            loader.style.display = 'none';
         }
     }
 }
@@ -1288,6 +1296,11 @@ function mostrarModalCategoria() {
     if (modal) {
         modal.classList.add('active');
     }
+    
+    // Ocultar botones flotantes cuando se muestra el modal
+    document.querySelectorAll('.btn-anadir, #btn-abrir-modal-registro').forEach(btn => {
+        if (btn) btn.style.display = 'none';
+    });
 }
 
 // Función para ocultar el modal de categoría
@@ -1310,6 +1323,11 @@ function ocultarModalCategoria() {
     if (modalTitulo) {
         modalTitulo.textContent = 'Nueva Categoría';
     }
+    
+    // Mostrar botones flotantes cuando se oculta el modal
+    document.querySelectorAll('.btn-anadir, #btn-abrir-modal-registro').forEach(btn => {
+        if (btn) btn.style.display = 'flex';
+    });
 }
 
 // Función para configurar el modal para nuevo ejercicio
@@ -1362,11 +1380,9 @@ async function manejarSubmitCategoria(e) {
         if (currentlyEditingCategoriaId) {
             // Estamos editando
             await editarCategoria(currentlyEditingCategoriaId, nombre);
-            console.log('Categoría actualizada:', currentlyEditingCategoriaId);
         } else {
             // Es nueva
             await agregarCategoria(nombre);
-            console.log('Categoría agregada:', nombre);
         }
         
         // 4. Recargar la lista de categorías
@@ -1445,7 +1461,6 @@ async function eliminarCategoriaHandler(categoriaId, botonElement) {
         await eliminarCategoria(categoriaId);
         const categorias = await obtenerCategorias();
         renderizarListaCategorias(categorias, editarCategoriaHandler, eliminarCategoriaHandler, mostrarVistaCategoriaEjercicios);
-        console.log('Categoría eliminada:', categoriaId);
     } catch (error) {
         // 3. Manejar el error
         console.error('Error al eliminar la categoría:', error);
@@ -1605,11 +1620,9 @@ async function manejarSubmitEjercicioCategoria(e) {
         if (currentlyEditingEjercicioCategoriaId) {
             // Editar ejercicio existente
             await editarEjercicioDeCategoria(categoriaActual.id, currentlyEditingEjercicioCategoriaId, ejercicioData);
-            console.log('Ejercicio de categoría actualizado:', nombre);
         } else {
             // Agregar nuevo ejercicio
             await agregarEjercicioACategoria(categoriaActual.id, ejercicioData);
-            console.log('Ejercicio agregado a la categoría:', nombre);
         }
         
         // 4. Recargar la lista de ejercicios
@@ -1658,7 +1671,6 @@ async function eliminarEjercicioCategoriaHandler(ejercicioId, botonElement) {
         await eliminarEjercicioDeCategoria(categoriaActual.id, ejercicioId);
         const ejercicios = await obtenerEjerciciosDeCategoria(categoriaActual.id);
         renderizarListaEjerciciosCategoria(ejercicios, editarEjercicioCategoriaHandler, eliminarEjercicioCategoriaHandler);
-        console.log('Ejercicio de categoría eliminado:', ejercicioId);
     } catch (error) {
         // 3. Manejar el error
         console.error('Error al eliminar el ejercicio de categoría:', error);
@@ -1764,7 +1776,17 @@ async function eliminarEjercicioBibliotecaHandler(ejercicioId, botonElement) {
         await eliminarEjercicioBiblioteca(ejercicioId);
         const ejercicios = await obtenerEjerciciosBiblioteca();
         renderizarListaBiblioteca(ejercicios, editarEjercicioBibliotecaHandler, eliminarEjercicioBibliotecaHandler);
-        console.log('Ejercicio de biblioteca eliminado:', ejercicioId);
+        
+        // 3. Refrescar la vista actual si estamos viendo un entreno que contenía este ejercicio
+        if (entrenoActual) {
+            try {
+                // Recargar el entreno actual para reflejar los cambios
+                await mostrarVistaEntreno(entrenoActual);
+            } catch (error) {
+                console.error('Error al refrescar vista de entreno:', error);
+                // No mostrar error al usuario, solo loguear
+            }
+        }
     } catch (error) {
         // 3. Manejar el error
         console.error('Error al eliminar el ejercicio de la biblioteca:', error);
@@ -1898,11 +1920,9 @@ async function manejarSubmitRegistro(e) {
         if (currentlyEditingRegistroId !== null) {
             // ESTAMOS EDITANDO
             await actualizarRegistroEnEjercicio(entrenoActual.id, ejercicioActual.id, currentlyEditingRegistroId, datosRegistro);
-            console.log('Registro actualizado:', datosRegistro);
         } else {
             // ESTAMOS CREANDO UN NUEVO REGISTRO
             await agregarRegistroAEjercicio(entrenoActual.id, ejercicioActual.id, datosRegistro);
-            console.log('Registro guardado:', datosRegistro);
         }
         
         // Actualizar el ejercicio actual con los nuevos registros
@@ -2057,8 +2077,6 @@ async function eliminarRegistro(registroId, botonElement) {
         
         // Actualizar la lista de registros
         renderizarListaRegistros(registros, editarRegistro, eliminarRegistro);
-        
-        console.log('Registro eliminado:', registroId);
     } catch (error) {
         // 3. Manejar el error
         console.error('Error al eliminar el registro:', error);
@@ -2093,8 +2111,6 @@ async function eliminarEjercicio(ejercicioId, botonElement) {
         
         // Actualizar barra de progreso
         actualizarBarraProgreso();
-        
-        console.log('Ejercicio eliminado:', ejercicioId);
     } catch (error) {
         // 3. Manejar el error
         console.error('Error al eliminar el ejercicio:', error);
@@ -2406,8 +2422,6 @@ function configurarEventListenersModalSeleccionSustitucion(ejercicioIdOriginal) 
                 
                 // Actualizar barra de progreso
                 actualizarBarraProgreso();
-                
-                console.log('Ejercicio sustituido desde la biblioteca');
             } catch (error) {
                 console.error('Error al sustituir ejercicio:', error);
                 tarjeta.classList.remove('is-loading');
@@ -2502,13 +2516,11 @@ async function initApp() {
         // se configuran en configurarEventListenersEntrenoView(), que se llama
         // después de renderizar la vista de entreno en mostrarVistaEntreno()
         
-        console.log('Aplicación inicializada correctamente');
-        
         // Registrar el Service Worker
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/sw.js')
-                .then(registration => {
-                    console.log('Service Worker registrado con éxito:', registration);
+                .then(() => {
+                    // Service Worker registrado
                 })
                 .catch(error => {
                     console.error('Error al registrar el Service Worker:', error);
@@ -2527,7 +2539,6 @@ async function initApp() {
 
 // Inicializar la aplicación cuando el DOM esté listo
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('DOM cargado');
     initApp();
 });
 
