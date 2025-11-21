@@ -1,5 +1,42 @@
 // ui.js - Lógica de manipulación del DOM
 
+// Función auxiliar para formatear fecha visual sin problemas de timezone
+function formatearFechaVisual(fechaString) {
+    if (!fechaString) return '--';
+    
+    // Asume formato YYYY-MM-DD
+    if (typeof fechaString === 'string' && fechaString.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        const partes = fechaString.split('-');
+        if (partes.length === 3) {
+            const [year, month, day] = partes;
+            return `${day}/${month}/${year}`; // Formato local simple DD/MM/YYYY
+        }
+    }
+    
+    // Si no es el formato esperado, devolver tal cual
+    return fechaString;
+}
+
+// Función auxiliar para formatear fecha corta (día y mes corto) sin problemas de timezone
+function formatearFechaCorta(fechaString) {
+    if (!fechaString) return '--';
+    
+    // Asume formato YYYY-MM-DD
+    if (typeof fechaString === 'string' && fechaString.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        const partes = fechaString.split('-');
+        if (partes.length === 3) {
+            const [year, month, day] = partes;
+            const meses = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+            const mesIndex = parseInt(month, 10) - 1;
+            const mesCorto = meses[mesIndex] || month;
+            return `${day} ${mesCorto}`; // Formato: "21 nov"
+        }
+    }
+    
+    // Si no es el formato esperado, devolver tal cual
+    return fechaString;
+}
+
 // Configuración de métricas corporales
 const METRICAS_CONFIG = {
     peso: { label: 'PESO', unit: 'kg' }, // El peso depende de la altura, difícil dar rango fijo aquí
@@ -82,7 +119,6 @@ function obtenerRangoMetrica(metricaKey, valor) {
 let dashboardView = null;
 let entrenoView = null;
 let ejercicioView = null;
-let dashboardContainer = null;
 let listaEjercicios = null;
 let entrenoTitulo = null;
 let modalNuevoEjercicio = null;
@@ -98,12 +134,22 @@ function obtenerImagenSegura(imagenUrl) {
     return imagenUrl;
 }
 
+// Función auxiliar para renderizar el botón volver flotante
+function renderizarBotonVolver() {
+    return `
+      <button id="btn-volver-float" class="btn-volver-flotante" aria-label="Regresar">
+        <svg viewBox="0 0 24 24" class="icon-back">
+          <path d="M15 18l-6-6 6-6" />
+        </svg>
+      </button>
+    `;
+  }
+
 // Función para actualizar referencias a elementos del DOM
 function actualizarReferenciasDOM() {
     dashboardView = document.getElementById('dashboard-view');
     entrenoView = document.getElementById('entreno-view');
     ejercicioView = document.getElementById('ejercicio-view');
-    dashboardContainer = document.querySelector('.dashboard-container');
     // Usar lista-ejercicios-container si existe, sino lista-ejercicios (para compatibilidad)
     listaEjercicios = document.getElementById('lista-ejercicios-container') || document.getElementById('lista-ejercicios');
     entrenoTitulo = document.getElementById('entreno-titulo');
@@ -115,26 +161,23 @@ function actualizarReferenciasDOM() {
 
 // Función para mostrar una vista específica y ocultar las demás
 export function showView(viewToShow) {
-    actualizarReferenciasDOM();
-    
-    // Ocultar todas las vistas
-    if (dashboardView) dashboardView.classList.remove('active');
-    if (entrenoView) entrenoView.classList.remove('active');
-    if (ejercicioView) ejercicioView.classList.remove('active');
-    const bibliotecaView = document.getElementById('biblioteca-view');
-    if (bibliotecaView) bibliotecaView.classList.remove('active');
-    const categoriaEjerciciosView = document.getElementById('categoria-ejercicios-view');
-    if (categoriaEjerciciosView) categoriaEjerciciosView.classList.remove('active');
-    const perfilView = document.getElementById('perfil-view');
-    if (perfilView) perfilView.classList.remove('active');
+    // Ocultar TODAS las vistas explícitamente usando el selector común
+    document.querySelectorAll('.view').forEach(view => {
+        view.classList.remove('active');
+        view.style.display = 'none';
+    });
     
     // Mostrar la vista solicitada
     if (viewToShow) {
         viewToShow.classList.add('active');
+        viewToShow.style.display = 'flex';
     }
     
     // Obtener el ID de la vista activa
     const viewId = viewToShow ? viewToShow.id : null;
+    
+    // Actualizar referencias DOM después de cambiar las vistas
+    actualizarReferenciasDOM();
     
     // Actualizar tabs activos (nuevo selector para Floating Tab Bar)
     const navItems = document.querySelectorAll('.nav-item');
@@ -145,33 +188,40 @@ export function showView(viewToShow) {
         }
     });
     
+    // Mostrar/ocultar botón "Volver" flotante según la vista activa
+    const btnVolverFloat = document.getElementById('btn-volver-float');
+    if (btnVolverFloat) {
+        // Ocultar en vistas principales, mostrar en sub-vistas
+        if (viewId === 'dashboard-view' || viewId === 'biblioteca-view' || viewId === 'perfil-view' || viewId === 'calendario-view') {
+            btnVolverFloat.style.display = 'none';
+        } else {
+            btnVolverFloat.style.display = 'flex';
+        }
+    }
+    
     // Mostrar/ocultar botón "Volver" según la vista activa
     const backButton = document.getElementById('back-button');
     if (backButton) {
-        if (viewId === 'dashboard-view' || viewId === 'biblioteca-view' || viewId === 'perfil-view') {
+        if (viewId === 'dashboard-view' || viewId === 'biblioteca-view' || viewId === 'perfil-view' || viewId === 'calendario-view') {
             backButton.style.display = 'none';
         } else {
             backButton.style.display = 'block';
         }
     }
     
-    // Mostrar/ocultar header de perfil solo en dashboard-view
-    const headerLeft = document.querySelector('.header-left');
-    if (headerLeft) {
-        if (viewId === 'dashboard-view') {
-            headerLeft.style.display = 'flex';
-        } else {
-            headerLeft.style.display = 'none';
-        }
+    // Ocultar header completo en todas las vistas
+    const mainHeader = document.getElementById('main-header');
+    if (mainHeader) {
+        mainHeader.style.display = 'none';
     }
 }
 
 // Función para renderizar la vista completa del dashboard
-export function renderizarDashboardView(entrenos, onEntrenoClick, onBibliotecaClick) {
+export function renderizarDashboardView(entrenos, onEntrenoClick) {
     actualizarReferenciasDOM();
     
     const dashboardHTML = `
-        <h1>Entrenos</h1>
+        <h1>ENTRENOS</h1>
         <div class="dashboard-container">
             ${entrenos.map(entreno => `
                 <div class="entreno-card" data-entreno-id="${entreno.id}">
@@ -200,16 +250,13 @@ export function renderizarDashboardView(entrenos, onEntrenoClick, onBibliotecaCl
     actualizarReferenciasDOM();
 }
 
-// Función para renderizar las tarjetas de entreno en el dashboard (mantener compatibilidad)
-export function renderizarEntrenos(entrenos, onEntrenoClick) {
-    renderizarDashboardView(entrenos, onEntrenoClick);
-}
 
 // Función para renderizar la vista completa de entreno (solo el esqueleto con spinner)
 export function renderizarEntrenoView(entreno) {
     actualizarReferenciasDOM();
     
     const entrenoHTML = `
+        ${renderizarBotonVolver()}
         <h2 id="entreno-titulo">${entreno.nombre}</h2>
         <div id="breadcrumbs" class="breadcrumbs-container"></div>
         <div class="progress-wrapper">
@@ -225,7 +272,6 @@ export function renderizarEntrenoView(entreno) {
         <div id="lista-ejercicios-container" class="lista-ejercicios">
             <div class="loader-spinner" style="margin: 40px auto;"></div>
         </div>
-        <button id="btn-anadir-ejercicio" class="btn btn-anadir">Añadir Ejercicio</button>
         
         <!-- Modal para seleccionar ejercicio de la biblioteca -->
         <div id="modal-seleccion-ejercicio" class="modal" style="display: none;"></div>
@@ -270,11 +316,6 @@ export function renderizarListaEjercicios(ejercicios, onEditarClick, onEliminarC
     
     // Limpiar el contenedor (remover el spinner)
     listaContainer.innerHTML = '';
-    
-    if (ejercicios.length === 0) {
-        listaContainer.innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 20px;">No hay ejercicios agregados aún</p>';
-        return;
-    }
     
     // Separar ejercicios en pendientes y completados
     // Filtrar estrictamente: pendientes son los que NO están completados hoy
@@ -325,7 +366,10 @@ export function renderizarListaEjercicios(ejercicios, onEditarClick, onEliminarC
                 <div class="ejercicio-card-content">
                     <div class="ejercicio-card-content-wrapper">
                         <img src="${ejercicio.imagenUrl || ejercicio.imagenBase64}" alt="${ejercicio.nombre}" class="ejercicio-card-image">
-                        <h3 class="ejercicio-card-title">${ejercicio.nombre}</h3>
+                        <div>
+                            ${ejercicio.nombreCategoria ? `<span class="ejercicio-tag">${ejercicio.nombreCategoria}</span>` : ''}
+                            <h3 class="ejercicio-card-title">${ejercicio.nombre}</h3>
+                        </div>
                     </div>
                 </div>
                 <div class="ejercicio-card-actions">
@@ -370,24 +414,51 @@ export function renderizarListaEjercicios(ejercicios, onEditarClick, onEliminarC
         return card;
     };
     
-    // Renderizar ejercicios pendientes primero
-    pendientes.forEach(ejercicio => {
-        const card = renderizarTarjeta(ejercicio, false);
-        listaContainer.appendChild(card);
-    });
+    // Crear contenedor para ejercicios pendientes
+    const listaPendientes = document.createElement('div');
+    listaPendientes.id = 'lista-pendientes';
     
-    // Añadir separador visual si hay completados
+    // Renderizar ejercicios pendientes
+    if (pendientes.length === 0 && ejercicios.length === 0) {
+        // Caso: lista completamente vacía
+        listaPendientes.innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 20px;">No hay ejercicios agregados aún</p>';
+    } else {
+        pendientes.forEach(ejercicio => {
+            const card = renderizarTarjeta(ejercicio, false);
+            listaPendientes.appendChild(card);
+        });
+    }
+    
+    listaContainer.appendChild(listaPendientes);
+    
+    // Añadir botón "Añadir Ejercicio" en contenedor inline (siempre visible)
+    const btnContainer = document.createElement('div');
+    btnContainer.className = 'btn-container-inline';
+    const btnAnadir = document.createElement('button');
+    btnAnadir.id = 'btn-anadir-ejercicio';
+    btnAnadir.className = 'btn btn-anadir';
+    btnAnadir.textContent = 'Añadir Ejercicio';
+    btnContainer.appendChild(btnAnadir);
+    listaContainer.appendChild(btnContainer);
+    
+    // Añadir separador visual y completados si existen
     if (completados.length > 0) {
         const separador = document.createElement('h3');
         separador.className = 'section-title completados-title';
         separador.textContent = 'COMPLETADOS';
         listaContainer.appendChild(separador);
         
+        // Crear contenedor para ejercicios completados
+        const listaCompletados = document.createElement('div');
+        listaCompletados.id = 'lista-completados';
+        
         // Renderizar ejercicios completados
         completados.forEach(ejercicio => {
             const card = renderizarTarjeta(ejercicio, true);
-            listaContainer.appendChild(card);
+            listaCompletados.appendChild(card);
         });
+        
+        listaContainer.appendChild(listaCompletados);
     }
     
     // Agregar event listeners a los botones
@@ -430,7 +501,9 @@ export function renderizarBibliotecaView() {
         <div id="lista-categorias" class="lista-ejercicios">
             <div class="loader-spinner" style="margin: 40px auto;"></div>
         </div>
-        <button id="btn-anadir-categoria" class="btn btn-anadir">Añadir Categoría</button>
+        <div class="btn-container-inline">
+            <button id="btn-anadir-categoria" class="btn btn-anadir">Añadir Categoría</button>
+        </div>
         
         <!-- Modal para nueva categoría -->
         <div id="modal-nueva-categoria" class="modal">
@@ -467,12 +540,15 @@ export function renderizarCategoriaEjerciciosView(categoriaNombre) {
     }
     
     const categoriaEjerciciosHTML = `
+        ${renderizarBotonVolver()}
         <h2 id="categoria-ejercicios-titulo">${categoriaNombre.toUpperCase()}</h2>
         <div id="breadcrumbs" class="breadcrumbs-container"></div>
         <div id="lista-ejercicios-categoria-container" class="lista-ejercicios">
             <div class="loader-spinner" style="margin: 40px auto;"></div>
         </div>
-        <button id="btn-anadir-ejercicio-categoria" class="btn btn-anadir">Añadir Ejercicio</button>
+        <div class="btn-container-inline">
+            <button id="btn-anadir-ejercicio-categoria" class="btn btn-anadir">Añadir Ejercicio</button>
+        </div>
         
         <!-- Modal para nuevo ejercicio de categoría -->
         <div id="modal-nuevo-ejercicio-categoria" class="modal">
@@ -836,8 +912,15 @@ export function renderizarListaBiblioteca(ejercicios, onEditarClick, onEliminarC
 export function renderizarEjercicioView(ejercicio, registros, onEditarRegistroClick, onEliminarRegistroClick) {
     actualizarReferenciasDOM();
     
-    // Obtener fecha de hoy en formato YYYY-MM-DD
-    const hoy = new Date().toISOString().split('T')[0];
+    // Obtener fecha de hoy en formato YYYY-MM-DD (fecha local)
+    const obtenerFechaLocal = () => {
+        const ahora = new Date();
+        const year = ahora.getFullYear();
+        const month = String(ahora.getMonth() + 1).padStart(2, '0');
+        const day = String(ahora.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+    const hoy = obtenerFechaLocal();
     
     // Función auxiliar para formatear una serie
     const formatearSerie = (serie) => {
@@ -868,7 +951,7 @@ export function renderizarEjercicioView(ejercicio, registros, onEditarRegistroCl
                             const series = registro.series || [];
                             return `
                                 <tr>
-                                    <td>${new Date(registro.fecha).toLocaleDateString('es-ES')}</td>
+                                    <td>${formatearFechaVisual(registro.fecha)}</td>
                                     <td class="serie-cell">${formatearSerie(series[0])}</td>
                                     <td class="serie-cell">${formatearSerie(series[1])}</td>
                                     <td class="serie-cell">${formatearSerie(series[2])}</td>
@@ -898,6 +981,7 @@ export function renderizarEjercicioView(ejercicio, registros, onEditarRegistroCl
         : '<p style="color: var(--text-secondary); text-align: center; padding: 20px;">No hay registros aún</p>';
     
     const ejercicioHTML = `
+        ${renderizarBotonVolver()}
         <h2 id="ejercicio-titulo">${ejercicio.nombre}</h2>
         <div id="breadcrumbs" class="breadcrumbs-container"></div>
         <img src="${ejercicio.imagenUrl || ejercicio.imagenBase64}" alt="${ejercicio.nombre}" class="ejercicio-view-image">
@@ -928,9 +1012,9 @@ export function renderizarEjercicioView(ejercicio, registros, onEditarRegistroCl
                                 <div class="serie-input">
                                     <label>Serie ${num}</label>
                                     <div class="serie-inputs">
-                                        <input type="number" id="peso-serie-${num}" name="peso-${num}" placeholder="Peso (kg)" min="0" step="0.5">
+                                        <input type="number" id="peso-serie-${num}" name="peso-${num}" placeholder="Peso (kg)" min="0" step="any">
                                         <span>x</span>
-                                        <input type="number" id="rep-serie-${num}" name="rep-${num}" placeholder="Reps" min="0">
+                                        <input type="number" id="rep-serie-${num}" name="rep-${num}" placeholder="Reps" min="0" step="any">
                                     </div>
                                 </div>
                             `).join('')}
@@ -1020,7 +1104,7 @@ export function renderizarListaRegistros(registros, onEditarRegistroClick, onEli
                             const series = registro.series || [];
                             return `
                                 <tr>
-                                    <td>${new Date(registro.fecha).toLocaleDateString('es-ES')}</td>
+                                    <td>${formatearFechaVisual(registro.fecha)}</td>
                                     <td class="serie-cell">${formatearSerie(series[0])}</td>
                                     <td class="serie-cell">${formatearSerie(series[1])}</td>
                                     <td class="serie-cell">${formatearSerie(series[2])}</td>
@@ -1078,85 +1162,6 @@ export function renderizarListaRegistros(registros, onEditarRegistroClick, onEli
 }
 
 // Función para renderizar los ejercicios en la lista (actualiza solo la lista)
-export function renderizarEjercicios(ejercicios, onEditarClick, onEliminarClick, onEjercicioClick) {
-    actualizarReferenciasDOM();
-    
-    if (!listaEjercicios) {
-        console.error('listaEjercicios no encontrado');
-        return;
-    }
-    
-    listaEjercicios.innerHTML = '';
-    
-    if (ejercicios.length === 0) {
-        listaEjercicios.innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 20px;">No hay ejercicios agregados aún</p>';
-        return;
-    }
-    
-    ejercicios.forEach((ejercicio, index) => {
-        const card = document.createElement('div');
-        card.className = 'ejercicio-card';
-        card.style.cursor = 'pointer';
-        card.dataset.ejercicioId = ejercicio.id;
-        
-        card.innerHTML = `
-            <img src="${ejercicio.imagenUrl || ejercicio.imagenBase64}" alt="${ejercicio.nombre}" class="ejercicio-card-image">
-            <div class="ejercicio-card-content">
-                <h3 class="ejercicio-card-title">${ejercicio.nombre}</h3>
-            </div>
-            <div class="ejercicio-card-actions">
-                <button class="btn-editar" data-ejercicio-id="${ejercicio.id}" title="Editar">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                    </svg>
-                </button>
-                <button class="btn-sustituir" data-ejercicio-id="${ejercicio.id}" title="Sustituir">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"></path>
-                    </svg>
-                </button>
-                <button class="btn-eliminar" data-ejercicio-id="${ejercicio.id}" title="Eliminar">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <polyline points="3 6 5 6 21 6"></polyline>
-                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                    </svg>
-                </button>
-            </div>
-        `;
-        
-        // Agregar event listener para hacer clic en la tarjeta (navegar a vista de ejercicio)
-        if (onEjercicioClick) {
-            card.addEventListener('click', function(e) {
-                // No navegar si se hace clic en los botones
-                if (!e.target.closest('.ejercicio-card-actions')) {
-                    onEjercicioClick(ejercicio.id);
-                }
-            });
-        }
-        
-        listaEjercicios.appendChild(card);
-    });
-    
-    // Agregar event listeners a los botones
-    const botonesEliminar = listaEjercicios.querySelectorAll('.btn-eliminar');
-    botonesEliminar.forEach(boton => {
-        boton.addEventListener('click', function(e) {
-            e.stopPropagation();
-            const ejercicioId = parseInt(this.dataset.ejercicioId);
-            onEliminarClick(ejercicioId, this); // Pasar el botón como segundo parámetro
-        });
-    });
-    
-    const botonesEditar = listaEjercicios.querySelectorAll('.btn-editar');
-    botonesEditar.forEach(boton => {
-        boton.addEventListener('click', function(e) {
-            e.stopPropagation();
-            const ejercicioId = parseInt(this.dataset.ejercicioId);
-            onEditarClick(ejercicioId);
-        });
-    });
-}
 
 // Función para mostrar el modal
 export function mostrarModal() {
@@ -1203,6 +1208,20 @@ export function mostrarModalRegistro() {
         modalRegistro.classList.add('active');
     }
     
+    // Establecer fecha actual en el input si es un nuevo registro
+    const fechaInput = document.getElementById('fecha-registro');
+    if (fechaInput && !fechaInput.value) {
+        // Función auxiliar para obtener fecha local
+        const obtenerFechaLocal = () => {
+            const ahora = new Date();
+            const year = ahora.getFullYear();
+            const month = String(ahora.getMonth() + 1).padStart(2, '0');
+            const day = String(ahora.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        };
+        fechaInput.value = obtenerFechaLocal();
+    }
+    
     // Ocultar botones flotantes cuando se muestra el modal
     document.querySelectorAll('.btn-anadir, #btn-abrir-modal-registro').forEach(btn => {
         if (btn) btn.style.display = 'none';
@@ -1227,8 +1246,15 @@ export function ocultarModalRegistro() {
         if (btn) btn.style.display = 'flex';
     });
         if (fechaInput) {
-            const hoy = new Date().toISOString().split('T')[0];
-            fechaInput.value = hoy;
+            // Función auxiliar para obtener fecha local
+            const obtenerFechaLocal = () => {
+                const ahora = new Date();
+                const year = ahora.getFullYear();
+                const month = String(ahora.getMonth() + 1).padStart(2, '0');
+                const day = String(ahora.getDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
+            };
+            fechaInput.value = obtenerFechaLocal();
         }
         
         // Restaurar el texto del botón a "Guardar Registro"
@@ -1363,13 +1389,6 @@ export function actualizarTituloModal(titulo) {
 }
 
 // Función para actualizar el título del entreno
-export function actualizarTituloEntreno(nombre) {
-    actualizarReferenciasDOM();
-    if (entrenoTitulo) {
-        entrenoTitulo.textContent = nombre;
-    }
-}
-
 // Función para obtener valores del formulario
 export function obtenerValoresFormulario() {
     actualizarReferenciasDOM();
@@ -1379,23 +1398,6 @@ export function obtenerValoresFormulario() {
     };
 }
 
-// Función para configurar el modal para nuevo ejercicio
-export function configurarModalNuevoEjercicio() {
-    actualizarReferenciasDOM();
-    if (inputImagenEjercicio) {
-        inputImagenEjercicio.setAttribute('required', 'required');
-    }
-    actualizarTituloModal('Nuevo Ejercicio');
-}
-
-// Función para configurar el modal para editar ejercicio
-export function configurarModalEditarEjercicio() {
-    actualizarReferenciasDOM();
-    if (inputImagenEjercicio) {
-        inputImagenEjercicio.removeAttribute('required');
-    }
-    actualizarTituloModal('Editar Ejercicio');
-}
 
 // Exportar referencias a elementos del DOM que main.js necesita
 export function getDashboardView() {
@@ -1445,9 +1447,25 @@ export function getCategoriaEjerciciosView() {
 }
 
 // Función para actualizar los breadcrumbs
-export function actualizarBreadcrumbs(links, onNavigate) {
-    const breadcrumbsContainer = document.getElementById('breadcrumbs');
+export function actualizarBreadcrumbs(links, onNavigate, container = null) {
+    // Si se proporciona un contenedor, usarlo; si no, buscar en la vista activa o en todo el documento
+    let breadcrumbsContainer = container;
+    
     if (!breadcrumbsContainer) {
+        // Buscar primero en la vista activa
+        const activeView = document.querySelector('.view.active');
+        if (activeView) {
+            breadcrumbsContainer = activeView.querySelector('#breadcrumbs');
+        }
+        
+        // Si no se encuentra, buscar en todo el documento
+        if (!breadcrumbsContainer) {
+            breadcrumbsContainer = document.getElementById('breadcrumbs');
+        }
+    }
+    
+    if (!breadcrumbsContainer) {
+        console.error('No se encontró el contenedor de breadcrumbs');
         return;
     }
     
@@ -1501,39 +1519,17 @@ function renderizarTablaHistorial(historial) {
     }
     
     // Ordenar por fecha descendente (más reciente primero)
+    // Usar comparación de strings YYYY-MM-DD directamente (sin Date para evitar timezone)
     const historialOrdenado = [...historial].sort((a, b) => {
-        const fechaA = new Date(a.fecha).getTime();
-        const fechaB = new Date(b.fecha).getTime();
-        return fechaB - fechaA;
+        const fechaA = a.fecha || '';
+        const fechaB = b.fecha || '';
+        // Comparar strings directamente (YYYY-MM-DD se ordena correctamente como string)
+        return fechaB.localeCompare(fechaA);
     });
     
     const tarjetas = historialOrdenado.map(medicion => {
-        // Manejar fecha como string YYYY-MM-DD o Date
-        let fechaFormateada = '';
-        if (medicion.fecha) {
-            if (typeof medicion.fecha === 'string' && medicion.fecha.match(/^\d{4}-\d{2}-\d{2}$/)) {
-                // Si es string YYYY-MM-DD, parsear manualmente para evitar problemas de timezone
-                const partes = medicion.fecha.split('-');
-                const año = parseInt(partes[0], 10);
-                const mes = parseInt(partes[1], 10) - 1;
-                const dia = parseInt(partes[2], 10);
-                const fecha = new Date(año, mes, dia);
-                fechaFormateada = fecha.toLocaleDateString('es-ES', { 
-                    day: '2-digit', 
-                    month: '2-digit', 
-                    year: 'numeric' 
-                });
-            } else {
-                // Si es Date o ISO string, usar directamente
-                const fecha = new Date(medicion.fecha);
-                fechaFormateada = fecha.toLocaleDateString('es-ES', { 
-                    day: '2-digit', 
-                    month: '2-digit', 
-                    year: 'numeric',
-                    timeZone: 'UTC'
-                });
-            }
-        }
+        // Usar función auxiliar para formatear fecha sin problemas de timezone
+        const fechaFormateada = formatearFechaVisual(medicion.fecha);
         
         return `
             <div class="historial-card" data-id="${medicion.id}">
@@ -1695,15 +1691,15 @@ export function renderizarPerfilView(datosPerfil = {}) {
                     </div>
                     <div class="form-group">
                         <label for="peso-perfil">Peso (kg)</label>
-                        <input type="number" id="peso-perfil" name="peso" min="1" max="500" step="0.1">
+                        <input type="number" id="peso-perfil" name="peso" min="1" max="500" step="any">
                     </div>
                     <div class="form-group">
                         <label for="altura-perfil">Altura (cm)</label>
-                        <input type="number" id="altura-perfil" name="altura" min="1" max="300" step="1">
+                        <input type="number" id="altura-perfil" name="altura" min="1" max="300" step="any">
                     </div>
                     <div class="form-group">
                         <label for="edad-perfil">Edad</label>
-                        <input type="number" id="edad-perfil" name="edad" min="1" max="150" step="1">
+                        <input type="number" id="edad-perfil" name="edad" min="1" max="150" step="any">
                     </div>
                     <div class="modal-buttons">
                         <button type="button" id="btn-cancelar-perfil" class="btn btn-secondary">Cancelar</button>
@@ -1724,23 +1720,23 @@ export function renderizarPerfilView(datosPerfil = {}) {
                     </div>
                     <div class="form-group">
                         <label for="peso-medicion">Peso (kg)</label>
-                        <input type="number" id="peso-medicion" name="peso" min="1" max="500" step="0.1" required>
+                        <input type="number" id="peso-medicion" name="peso" min="1" max="500" step="any" required>
                     </div>
                     <div class="form-group">
                         <label for="grasa-medicion">Grasa (%)</label>
-                        <input type="number" id="grasa-medicion" name="grasa" min="0" max="100" step="0.1">
+                        <input type="number" id="grasa-medicion" name="grasa" min="0" max="100" step="any">
                     </div>
                     <div class="form-group">
                         <label for="musculo-medicion">Músculo (%)</label>
-                        <input type="number" id="musculo-medicion" name="musculo" min="0" max="100" step="0.1">
+                        <input type="number" id="musculo-medicion" name="musculo" min="0" max="100" step="any">
                     </div>
                     <div class="form-group">
                         <label for="agua-medicion">Agua (%)</label>
-                        <input type="number" id="agua-medicion" name="agua" min="0" max="100" step="0.1">
+                        <input type="number" id="agua-medicion" name="agua" min="0" max="100" step="any">
                     </div>
                     <div class="form-group">
                         <label for="visceral-medicion">Visceral (Nivel)</label>
-                        <input type="number" id="visceral-medicion" name="visceral" min="0" max="50" step="0.1">
+                        <input type="number" id="visceral-medicion" name="visceral" min="0" max="50" step="any">
                     </div>
                     <div class="modal-buttons">
                         <button type="button" id="btn-cancelar-medicion" class="btn btn-secondary">Cancelar</button>
@@ -1834,5 +1830,243 @@ export function renderizarModalSeleccionEjercicio(ejerciciosPorCategoria) {
             </div>
         </div>
     `;
+}
+
+// Función para renderizar la vista de calendario
+export function renderizarCalendarioView(diasEntrenados = [], racha = 0) {
+    const calendarioView = document.getElementById('calendario-view');
+    if (!calendarioView) {
+        console.error('calendario-view no encontrado');
+        return;
+    }
+    
+    // Convertir array de objetos a Map para búsqueda rápida por fecha
+    const diasMap = new Map();
+    diasEntrenados.forEach(dia => {
+        const fecha = typeof dia === 'string' ? dia : dia.fecha;
+        diasMap.set(fecha, typeof dia === 'string' ? null : dia);
+    });
+    
+    // Obtener fecha actual
+    const hoy = new Date();
+    const añoActual = hoy.getFullYear();
+    const mesActual = hoy.getMonth(); // 0-11
+    const diaHoy = hoy.getDate();
+    
+    // Obtener primer día del mes y último día
+    const primerDia = new Date(añoActual, mesActual, 1);
+    const ultimoDia = new Date(añoActual, mesActual + 1, 0);
+    const diasEnMes = ultimoDia.getDate();
+    const diaSemanaInicio = primerDia.getDay(); // 0 (domingo) - 6 (sábado)
+    
+    // Nombres de meses y días
+    const nombresMeses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
+                          'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+    const nombresDias = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+    
+    // Calcular estadísticas del mes
+    let diasEntrenadosMes = 0;
+    let diasCumplidosMes = 0;
+    const entrenosPorNombre = new Map();
+    
+    // Generar grid de días
+    let gridHTML = '<div class="calendar-grid">';
+    
+    // Encabezados de días de la semana
+    nombresDias.forEach(dia => {
+        gridHTML += `<div class="calendar-day-header">${dia}</div>`;
+    });
+    
+    // Días vacíos al inicio del mes
+    for (let i = 0; i < diaSemanaInicio; i++) {
+        gridHTML += '<div class="calendar-day empty"></div>';
+    }
+    
+    // Calcular fecha de hoy para comparar
+    const fechaHoyString = `${añoActual}-${String(mesActual + 1).padStart(2, '0')}-${String(diaHoy).padStart(2, '0')}`;
+    let diasFalladosMes = 0;
+    
+    // Días del mes
+    for (let dia = 1; dia <= diasEnMes; dia++) {
+        const fechaString = `${añoActual}-${String(mesActual + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+        const fechaDia = new Date(fechaString + 'T12:00:00');
+        const fechaHoy = new Date(fechaHoyString + 'T12:00:00');
+        const esFuturo = fechaDia > fechaHoy;
+        const esHoy = dia === diaHoy;
+        const esPasado = fechaDia < fechaHoy;
+        const datosDia = diasMap.get(fechaString);
+        
+        let clases = 'calendar-day';
+        let cantidadCompletada = 0;
+        let totalEjercicios = 0;
+        let entrenoNombre = '';
+        let esRojo = false;
+        
+        // Aplicar reglas de estado según las especificaciones
+        if (esFuturo) {
+            // Futuro: Sin color (default)
+            clases += '';
+        } else if (!datosDia && (esPasado || esHoy)) {
+            // Rojo (Ausente): Fecha <= hoy Y NO existe registro
+            clases += ' day-red';
+            esRojo = true;
+            if (esPasado) {
+                diasFalladosMes++;
+            }
+        } else if (datosDia) {
+            cantidadCompletada = datosDia.cantidadCompletada || 0;
+            totalEjercicios = datosDia.totalEjercicios || 0;
+            entrenoNombre = datosDia.entrenoNombre || 'Entreno';
+            
+            // Aplicar clases según las reglas de estado
+            if (cantidadCompletada > 0 && cantidadCompletada < 3) {
+                clases += ' day-orange'; // Naranja (Incompleto)
+                diasEntrenadosMes++;
+            } else if (cantidadCompletada >= 3 && cantidadCompletada < totalEjercicios) {
+                clases += ' day-yellow'; // Amarillo (Cumplido)
+                diasEntrenadosMes++;
+                diasCumplidosMes++;
+            } else if (cantidadCompletada === totalEjercicios && totalEjercicios > 0) {
+                clases += ' day-green'; // Verde (Perfecto)
+                diasEntrenadosMes++;
+                diasCumplidosMes++;
+            }
+            
+            // Contar entrenos por nombre
+            if (entrenoNombre) {
+                entrenosPorNombre.set(entrenoNombre, (entrenosPorNombre.get(entrenoNombre) || 0) + 1);
+            }
+        }
+        
+        if (esHoy) {
+            clases += ' today';
+        }
+        
+        // Añadir atributos de datos para la interacción
+        const dataAttrs = datosDia 
+            ? `data-cantidad="${cantidadCompletada}" data-total="${totalEjercicios}" data-entreno="${entrenoNombre}"`
+            : esRojo ? 'data-rojo="true"' : '';
+        
+        gridHTML += `<div class="${clases}" data-fecha="${fechaString}" ${dataAttrs}>${dia}</div>`;
+    }
+    
+    gridHTML += '</div>';
+    
+    // Generar HTML de estadísticas mensuales
+    let estadisticasHTML = '<div class="calendario-estadisticas">';
+    estadisticasHTML += '<h3 class="estadisticas-title">Resumen del Mes</h3>';
+    estadisticasHTML += '<div class="estadisticas-grid">';
+    
+    estadisticasHTML += `
+        <div class="stat-card-mes">
+            <div class="stat-label-mes">Días Entrenados</div>
+            <div class="stat-value-mes">${diasEntrenadosMes}</div>
+        </div>
+        <div class="stat-card-mes">
+            <div class="stat-label-mes">Días Cumplidos</div>
+            <div class="stat-value-mes">${diasCumplidosMes}</div>
+        </div>
+        <div class="stat-card-mes stat-card-fallados">
+            <div class="stat-label-mes">Días Fallados</div>
+            <div class="stat-value-mes">${diasFalladosMes}</div>
+        </div>
+    `;
+    
+    estadisticasHTML += '</div>';
+    
+    // Desglose por entreno (Frecuencia)
+    if (entrenosPorNombre.size > 0) {
+        estadisticasHTML += '<div class="entrenos-desglose">';
+        estadisticasHTML += '<h4 class="desglose-title">Frecuencia por Entreno</h4>';
+        estadisticasHTML += '<div class="desglose-list">';
+        
+        Array.from(entrenosPorNombre.entries())
+            .sort((a, b) => b[1] - a[1]) // Ordenar por cantidad descendente
+            .forEach(([nombre, cantidad]) => {
+                estadisticasHTML += `
+                    <div class="desglose-item">
+                        <span class="desglose-nombre">Has entrenado ${nombre}</span>
+                        <span class="desglose-cantidad">${cantidad} vez${cantidad !== 1 ? 'es' : ''}</span>
+                    </div>
+                `;
+            });
+        
+        estadisticasHTML += '</div>';
+        estadisticasHTML += '</div>';
+    }
+    
+    estadisticasHTML += '</div>';
+    
+    // Toast para mostrar información del día
+    const toastHTML = '<div id="calendar-toast" class="calendar-toast" style="display: none;"></div>';
+    
+    const calendarioHTML = `
+        <div class="calendario-container">
+            <h2 class="calendario-title">CALENDARIO</h2>
+            
+            <div class="racha-card">
+                <div class="racha-icon ${racha > 0 ? 'fire-active' : ''}">🔥</div>
+                <div class="racha-content">
+                    <div class="racha-label">Racha Actual</div>
+                    <div class="racha-value">${racha} Semana${racha !== 1 ? 's' : ''}</div>
+                    <div class="racha-subtitle">Meta: 4 días/semana</div>
+                </div>
+            </div>
+            
+            <div class="calendario-mes-header">
+                <h3>${nombresMeses[mesActual]} ${añoActual}</h3>
+            </div>
+            
+            ${gridHTML}
+            
+            ${estadisticasHTML}
+            
+            ${toastHTML}
+        </div>
+    `;
+    
+    calendarioView.innerHTML = calendarioHTML;
+    
+    // Configurar event listeners para los días
+    const calendarDays = calendarioView.querySelectorAll('.calendar-day[data-fecha]');
+    const toast = calendarioView.querySelector('#calendar-toast');
+    
+    calendarDays.forEach(day => {
+        day.addEventListener('click', function() {
+            const fecha = this.dataset.fecha;
+            const cantidad = this.dataset.cantidad;
+            const total = this.dataset.total;
+            const entreno = this.dataset.entreno;
+            const esRojo = this.dataset.rojo === 'true';
+            
+            // Formatear fecha para mostrar (sin usar Date para evitar problemas de timezone)
+            const fechaFormateada = formatearFechaCorta(fecha);
+            
+            if (toast) {
+                if (esRojo) {
+                    // Día rojo: mostrar "Día de descanso"
+                    toast.textContent = `${fechaFormateada}: Día de descanso`;
+                } else if (cantidad && total && entreno) {
+                    // Día con datos: mostrar información del entreno
+                    toast.textContent = `${fechaFormateada}: ${entreno} - ${cantidad}/${total} Ejercicios`;
+                } else {
+                    // Día futuro sin datos
+                    return;
+                }
+                
+                toast.style.display = 'block';
+                
+                // Ocultar después de 3 segundos
+                setTimeout(() => {
+                    toast.style.display = 'none';
+                }, 3000);
+            }
+        });
+    });
+}
+
+// Función para obtener la vista de calendario
+export function getCalendarioView() {
+    return document.getElementById('calendario-view');
 }
 

@@ -57,12 +57,52 @@
     gap: 4px;
 }
 
-.btn-icon:hover {
-    background-color: #2a2a2c;
+/* Botón Volver Flotante */
+.btn-volver-flotante {
+    position: fixed;
+    top: 16px;
+    left: 16px;
+    width: 35px;
+    height: 35px;
+    border-radius: 50%;
+    background: rgba(28, 28, 28, 0.6); /* usa --bg-secondary */
+    backdrop-filter: blur(6px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 100;
+    transition: all .25s ease;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
 }
 
-.btn-icon:active {
-    transform: scale(0.98);
+/* Ícono (hereda los colores de tu app) */
+.btn-volver-flotante .icon-back {
+    width: 24px;
+    height: 24px;
+    stroke: var(--text-primary);
+    stroke-width: 2.5;
+    fill: none;
+    transition: all .25s ease;
+}
+
+/* Hover (PC) */
+.btn-volver-flotante:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: var(--accent-color);
+    transform: scale(1.08);
+    box-shadow: 0 0 12px var(--accent-color);
+}
+
+.btn-volver-flotante:hover .icon-back {
+    stroke: var(--accent-color);
+}
+
+/* Active (móvil y PC) */
+.btn-volver-flotante:active {
+    transform: scale(0.92);
+    box-shadow: 0 0 6px var(--accent-hover);
 }
 
 /* Responsive - Tablet y Desktop */
@@ -135,31 +175,59 @@
 
 .btn-anadir,
 #btn-abrir-modal-registro {
-    margin: 0;
-    margin-top: auto;
+    margin: 24px auto;
     padding: 14px 24px;
     font-size: 16px;
     font-weight: 600;
-    position: fixed;
-    left: 50%;
-    transform: translateX(-50%);
-    bottom: 90px;
-    width: 90%;
+    position: relative;
+    width: 100%;
     max-width: 500px;
-    z-index: 100;
     background-color: var(--accent-color);
     color: var(--text-tertiary);
-    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
     display: flex;
     justify-content: center;
     align-items: center;
     text-align: center;
+    border-radius: 8px;
 }
 
 .btn-anadir:active,
 #btn-abrir-modal-registro:active {
-    transform: translateX(-50%) scale(0.98);
+    transform: scale(0.98);
+}
+
+/* Contenedor inline para botón añadir (entre pendientes y completados) */
+.btn-container-inline {
+    margin: 20px 0 10px 0;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    padding-bottom: 0; /* El padding-bottom lo maneja el contenedor padre */
+}
+
+.btn-container-inline .btn-anadir {
     margin: 0;
+}
+
+/* Etiqueta de categoría en tarjetas de ejercicios */
+.ejercicio-card-content-wrapper > div {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.ejercicio-tag {
+    display: inline-block;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--accent-color);
+    border: 1px solid var(--accent-color);
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-bottom: 4px;
+    width: fit-content;
 }
 
 .btn-editar,
@@ -210,9 +278,14 @@
     border-radius: 12px;
     overflow: hidden;
     width: 100%;
+    height: 100%; /* Llenar la celda del grid */
+    display: flex;
+    flex-direction: column;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
     transition: all 0.2s ease-in-out;
     cursor: pointer;
+    margin: 0; /* Quitar márgenes viejos */
+    position: relative; /* Para posicionamiento del contenido */
 }
 
 .entreno-card:hover {
@@ -222,23 +295,31 @@
 
 .entreno-card-image {
     width: 100%;
-    height: 200px;
+    height: 100%;
+    flex: 1; /* Para que ocupe el espacio sobrante */
     object-fit: cover;
     display: block;
 }
 
 .entreno-card-content {
     padding: 16px;
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
+    z-index: 1;
 }
 
 .entreno-card-title {
-    color: var(--text-primary);
+    color: white;
     font-size: 18px;
     font-family: var(--font-title-secondary);
     font-weight: 700;
     /*text-transform: uppercase;*/
     letter-spacing: 0;
     margin: 0;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
 }
 
 .entreno-card:hover .entreno-card-title {
@@ -249,12 +330,16 @@
 .ejercicio-card {
     background-color: var(--bg-card);
     border-radius: 12px;
-    padding: 0;
     display: grid;
     grid-template-columns: 50px 1fr 50px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
     transition: opacity 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
     overflow: hidden;
+   
+}
+
+#lista-pendientes .ejercicio-card {
+    margin: 15px 0 15px 0;
 }
 
 /* Tarjetas de categorías */
@@ -312,8 +397,8 @@
 }
 
 .ejercicio-card-image {
-    width: 60px;
-    height: 60px;
+    width: 80px;
+    height: 80px;
     object-fit: cover;
     border-radius: 8px;
     flex-shrink: 0;
@@ -326,13 +411,13 @@
     align-items: center;
     gap: 10px;
     min-width: 0; /* Permite que el contenido se ajuste */
-    padding: 16px 0;
+    padding: 5px 0;
 }
 
 .ejercicio-card-content-wrapper {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 15px;
     flex: 1;
     min-width: 0;
 }
@@ -395,12 +480,12 @@
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    padding: 16px 0;
+    padding: 10px 0;
 }
 
 .checkbox-container .btn-check {
-    width: 28px;
-    height: 28px;
+    width: 20px;
+    height: 20px;
     cursor: pointer;
     flex-shrink: 0;
     border: 2px solid white;
@@ -614,30 +699,23 @@
 
     .btn-anadir,
     #btn-abrir-modal-registro {
-        width: 300px;
-        left: 50%;
-        transform: translateX(-50%);
-        right: auto;
-        bottom: 90px; /* Mantener elevado por encima del menú en desktop también */
-        margin: 0;
+        width: 100%;
+        max-width: 500px;
+        margin: 24px auto;
     }
     
     .btn-anadir:active,
     #btn-abrir-modal-registro:active {
-        transform: translateX(-50%) scale(0.98);
-        margin: 0;
+        transform: scale(0.98);
     }
     
-    /* Botones flotantes con estado de carga en desktop - mantener posición fija */
+    /* Botones con estado de carga en desktop */
     .btn-anadir.is-loading,
     #btn-abrir-modal-registro.is-loading {
-        position: fixed !important;
-        bottom: 90px !important;
-        left: 50% !important;
-        transform: translateX(-50%) !important;
-        width: 300px !important;
+        position: relative !important;
+        width: 100% !important;
         max-width: 500px !important;
-        margin: 0 !important;
+        margin: 24px auto !important;
         display: flex !important;
         justify-content: center !important;
         align-items: center !important;
@@ -679,16 +757,13 @@
     z-index: 1;
 }
 
-/* Botones flotantes con estado de carga - mantener posición fija */
+/* Botones con estado de carga */
 .btn-anadir.is-loading,
 #btn-abrir-modal-registro.is-loading {
-    position: fixed !important;
-    bottom: 90px !important;
-    left: 50% !important;
-    transform: translateX(-50%) !important;
-    width: 90% !important;
+    position: relative !important;
+    width: 100% !important;
     max-width: 500px !important;
-    margin: 0 !important;
+    margin: 24px auto !important;
     pointer-events: none;
     opacity: 0.7;
     color: transparent;

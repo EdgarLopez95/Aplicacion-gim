@@ -26,13 +26,16 @@ import {
     obtenerTodosLosEjerciciosDeBiblioteca,
     sustituirEjercicioEnEntreno,
     toggleCompletadoEjercicio,
+    obtenerFechaLocal,
     guardarPerfil,
     obtenerPerfil,
     guardarMedicion,
     obtenerHistorialCorporal,
     borrarTodoHistorialCorporal,
     actualizarMedicion,
-    eliminarMedicion
+    eliminarMedicion,
+    obtenerDiasEntrenados,
+    actualizarNombreEntreno
 } from './storage.js';
 
 import {
@@ -50,8 +53,6 @@ import {
     showInfoModal,
     poblarFormularioEjercicio,
     obtenerValoresFormulario,
-    configurarModalNuevoEjercicio,
-    configurarModalEditarEjercicio,
     getDashboardView,
     getEntrenoView,
     getEjercicioView,
@@ -68,7 +69,9 @@ import {
     renderizarListaEjerciciosCategoria,
     getCategoriaEjerciciosView,
     renderizarPerfilView,
-    renderizarModalSeleccionEjercicio
+    renderizarModalSeleccionEjercicio,
+    renderizarCalendarioView,
+    getCalendarioView
 } from './ui.js';
 
 // Referencia al botón cancelar (está en el HTML del modal)
@@ -84,67 +87,64 @@ let currentlyEditingCategoriaId = null;
 let currentlyEditingEjercicioCategoriaId = null;
 let categoriaActual = null;
 
-// Función para configurar event listeners de la vista de entreno
-function configurarEventListenersEntrenoView() {
-    const btnAnadir = getBtnAnadirEjercicio();
-    btnCancelarEjercicio = document.getElementById('btn-cancelar-ejercicio');
-    const formNuevoEjercicio = getFormNuevoEjercicio();
-    const modalNuevoEjercicio = getModalNuevoEjercicio();
+// Función auxiliar para manejar el clic en el botón "Añadir Ejercicio"
+async function manejarClicAnadirEjercicio() {
+    // Resetear el ID de edición a null
+    currentlyEditingId = null;
     
-    // Asignar event listeners (el HTML se regenera cada vez, así que no hay duplicados)
-    if (btnAnadir) {
-        btnAnadir.addEventListener('click', async function() {
-            // Resetear el ID de edición a null
-            currentlyEditingId = null;
-            
-            // Paso 1: Mostrar modal inmediatamente con spinner
-            renderizarModalSeleccionEjercicio(null);
-            const modalSeleccion = document.getElementById('modal-seleccion-ejercicio');
-            if (modalSeleccion) {
-                modalSeleccion.style.display = 'flex';
-            }
-            
-            // Configurar listener básico para cerrar el modal
-            const btnCerrar = document.getElementById('btn-cerrar-seleccion');
-            if (btnCerrar) {
-                btnCerrar.addEventListener('click', function() {
+    // Paso 1: Mostrar modal inmediatamente con spinner
+    renderizarModalSeleccionEjercicio(null);
+    const modalSeleccion = document.getElementById('modal-seleccion-ejercicio');
+    if (modalSeleccion) {
+        modalSeleccion.style.display = 'flex';
+    }
+    
+    // Configurar listener básico para cerrar el modal
+    const btnCerrar = document.getElementById('btn-cerrar-seleccion');
+    if (btnCerrar) {
+        btnCerrar.addEventListener('click', function() {
+            modalSeleccion.style.display = 'none';
+        });
+    }
+    
+    // Paso 2: Cargar datos en segundo plano
+    try {
+        const ejerciciosPorCategoria = await obtenerTodosLosEjerciciosDeBiblioteca();
+        
+        // Paso 3: Actualizar modal con los datos reales
+        renderizarModalSeleccionEjercicio(ejerciciosPorCategoria);
+        
+        // Configurar listeners del modal de selección
+        configurarEventListenersModalSeleccion();
+    } catch (error) {
+        console.error('Error al cargar ejercicios de la biblioteca:', error);
+        // Mostrar error en el modal
+        const modalContent = modalSeleccion?.querySelector('.modal-content');
+        if (modalContent) {
+            modalContent.innerHTML = `
+                <h3>SELECCIONAR EJERCICIO</h3>
+                <p style="text-align: center; padding: 20px; color: var(--text-secondary);">
+                    Error al cargar los ejercicios de la biblioteca.
+                </p>
+                <div class="modal-buttons">
+                    <button type="button" id="btn-cerrar-seleccion" class="btn btn-secondary">Cancelar</button>
+                </div>
+            `;
+            const btnCerrarError = document.getElementById('btn-cerrar-seleccion');
+            if (btnCerrarError) {
+                btnCerrarError.addEventListener('click', function() {
                     modalSeleccion.style.display = 'none';
                 });
             }
-            
-            // Paso 2: Cargar datos en segundo plano
-            try {
-                const ejerciciosPorCategoria = await obtenerTodosLosEjerciciosDeBiblioteca();
-                
-                // Paso 3: Actualizar modal con los datos reales
-                renderizarModalSeleccionEjercicio(ejerciciosPorCategoria);
-                
-                // Configurar listeners del modal de selección
-                configurarEventListenersModalSeleccion();
-            } catch (error) {
-                console.error('Error al cargar ejercicios de la biblioteca:', error);
-                // Mostrar error en el modal
-                const modalContent = modalSeleccion?.querySelector('.modal-content');
-                if (modalContent) {
-                    modalContent.innerHTML = `
-                        <h3>SELECCIONAR EJERCICIO</h3>
-                        <p style="text-align: center; padding: 20px; color: var(--text-secondary);">
-                            Error al cargar los ejercicios de la biblioteca.
-                        </p>
-                        <div class="modal-buttons">
-                            <button type="button" id="btn-cerrar-seleccion" class="btn btn-secondary">Cancelar</button>
-                        </div>
-                    `;
-                    const btnCerrarError = document.getElementById('btn-cerrar-seleccion');
-                    if (btnCerrarError) {
-                        btnCerrarError.addEventListener('click', function() {
-                            modalSeleccion.style.display = 'none';
-                        });
-                    }
-                }
-            }
-        });
+        }
     }
+}
+
+// Función para configurar event listeners de la vista de entreno
+function configurarEventListenersEntrenoView() {
+    btnCancelarEjercicio = document.getElementById('btn-cancelar-ejercicio');
+    const formNuevoEjercicio = getFormNuevoEjercicio();
+    const modalNuevoEjercicio = getModalNuevoEjercicio();
     
     if (btnCancelarEjercicio) {
         btnCancelarEjercicio.addEventListener('click', function() {
@@ -549,6 +549,26 @@ async function mostrarVistaPerfil() {
         configurarEventListenersPerfil();
         historialCorporalGlobal = [];
         renderizarGraficaComposicion([], filtroGraficaActual);
+    }
+}
+
+// Función para mostrar la vista de calendario
+async function mostrarVistaCalendario() {
+    try {
+        // 1. Obtener días entrenados
+        const diasEntrenados = await obtenerDiasEntrenados();
+        
+        // 2. Calcular racha semanal
+        const racha = calcularRachaSemanal(diasEntrenados);
+        
+        // 3. Renderizar la vista
+        renderizarCalendarioView(diasEntrenados, racha);
+        
+        // 4. Mostrar la vista
+        showView(getCalendarioView());
+    } catch (error) {
+        console.error('Error al cargar vista de calendario:', error);
+        alert('Error al cargar el calendario. Por favor, intenta de nuevo.');
     }
 }
 
@@ -1074,8 +1094,7 @@ function mostrarModalMedicion() {
         form.reset();
         const fechaInput = form.querySelector('#fecha-medicion');
         if (fechaInput) {
-            const hoy = new Date().toISOString().split('T')[0];
-            fechaInput.value = hoy;
+            fechaInput.value = obtenerFechaLocal();
         }
     }
     
@@ -1123,8 +1142,19 @@ async function mostrarModalEditarMedicion(id) {
             const visceralInput = form.querySelector('#visceral-medicion');
             
             if (fechaInput && medicion.fecha) {
-                const fecha = new Date(medicion.fecha);
-                fechaInput.value = fecha.toISOString().split('T')[0];
+                // Usar el string directamente sin conversión UTC
+                // Si viene como string "YYYY-MM-DD", usarlo tal cual
+                // Si viene como timestamp, convertirlo a string local
+                if (typeof medicion.fecha === 'string' && medicion.fecha.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                    fechaInput.value = medicion.fecha;
+                } else {
+                    // Si es un timestamp o formato diferente, convertir a fecha local
+                    const fecha = new Date(medicion.fecha);
+                    const year = fecha.getFullYear();
+                    const month = String(fecha.getMonth() + 1).padStart(2, '0');
+                    const day = String(fecha.getDate()).padStart(2, '0');
+                    fechaInput.value = `${year}-${month}-${day}`;
+                }
             }
             if (pesoInput) pesoInput.value = medicion.peso || '';
             if (grasaInput) grasaInput.value = medicion.grasa || '';
@@ -1165,7 +1195,9 @@ async function manejarGuardarMedicion() {
     const form = document.getElementById('form-medicion');
     if (!form) return;
     
-    const fecha = form.querySelector('#fecha-medicion').value;
+    // Obtener fecha directamente como string YYYY-MM-DD (sin conversión a Date)
+    const fechaInput = form.querySelector('#fecha-medicion');
+    const fecha = fechaInput ? fechaInput.value : null; // String directo: "2024-11-21"
     const peso = parseFloat(form.querySelector('#peso-medicion').value);
     const grasa = parseFloat(form.querySelector('#grasa-medicion').value);
     const musculo = parseFloat(form.querySelector('#musculo-medicion').value);
@@ -1827,15 +1859,39 @@ async function mostrarVistaEjercicio(ejercicioId) {
     // 2. Mostrar la vista
     showView(getEjercicioView());
     
-    // Actualizar breadcrumbs
-    actualizarBreadcrumbs([
-        { texto: 'Entrenos', vista: 'dashboard-view' },
-        { texto: entrenoActual.nombre, vista: 'entreno-view', action: 'mostrarEntreno', param: entrenoActual.id },
-        { texto: ejercicio.nombre }
-    ], manejarNavegacionBreadcrumbs);
+    // 3. Actualizar breadcrumbs DESPUÉS de que el HTML esté en el DOM
+    // Usar setTimeout para asegurar que el DOM esté completamente renderizado
+    setTimeout(() => {
+        // Asegurarse de que entrenoActual y ejercicio estén disponibles
+        if (entrenoActual && ejercicio) {
+            const ejercicioView = getEjercicioView();
+            const breadcrumbsContainer = ejercicioView ? ejercicioView.querySelector('#breadcrumbs') : null;
+            
+            // Pasar el contenedor directamente a la función
+            actualizarBreadcrumbs([
+                { texto: 'Entrenos', vista: 'dashboard-view' },
+                { texto: entrenoActual.nombre, vista: 'entreno-view', action: 'mostrarEntreno', param: entrenoActual.id },
+                { texto: ejercicio.nombre }
+            ], manejarNavegacionBreadcrumbs, breadcrumbsContainer);
+        }
+    }, 10);
     
-    // 3. Configurar event listeners
+    // 4. Configurar event listeners
     configurarEventListenersEjercicioView();
+    
+    // Configurar botón volver flotante DESPUÉS de que el HTML esté en el DOM
+    setTimeout(() => {
+        const btnVolver = document.getElementById('btn-volver-float');
+        if (btnVolver) {
+            btnVolver.addEventListener('click', () => {
+                if (entrenoActual) {
+                    mostrarVistaEntreno(entrenoActual);
+                } else {
+                    showView(getDashboardView());
+                }
+            });
+        }
+    }, 0);
 }
 
 // Función para configurar event listeners de la vista de ejercicio
@@ -1883,7 +1939,9 @@ async function manejarSubmitRegistro(e) {
     
     const form = e.target;
     const boton = form.querySelector('button[type="submit"]');
-    const fecha = form.querySelector('#fecha-registro').value;
+    // Obtener fecha directamente como string YYYY-MM-DD (sin conversión a Date)
+    const fechaInput = form.querySelector('#fecha-registro');
+    const fecha = fechaInput ? fechaInput.value : null; // String directo: "2024-11-21"
     const notas = form.querySelector('#notas-registro').value.trim();
     
     // Recopilar series
@@ -1936,7 +1994,7 @@ async function manejarSubmitRegistro(e) {
         form.reset();
         
         // Restaurar la fecha a hoy
-        form.querySelector('#fecha-registro').value = new Date().toISOString().split('T')[0];
+        form.querySelector('#fecha-registro').value = obtenerFechaLocal();
         
         // Resetear el ID de edición
         currentlyEditingRegistroId = null;
@@ -1989,10 +2047,18 @@ function editarRegistro(registroId) {
     // Fecha
     const fechaInput = form.querySelector('#fecha-registro');
     if (fechaInput) {
-        // Convertir la fecha al formato YYYY-MM-DD
-        const fecha = new Date(registro.fecha);
-        const fechaFormateada = fecha.toISOString().split('T')[0];
-        fechaInput.value = fechaFormateada;
+        // Usar el string directamente sin conversión UTC
+        // Si viene como string "YYYY-MM-DD", usarlo tal cual
+        if (typeof registro.fecha === 'string' && registro.fecha.match(/^\d{4}-\d{2}-\d{2}$/)) {
+            fechaInput.value = registro.fecha;
+        } else {
+            // Si es un timestamp o formato diferente, convertir a fecha local
+            const fecha = new Date(registro.fecha);
+            const year = fecha.getFullYear();
+            const month = String(fecha.getMonth() + 1).padStart(2, '0');
+            const day = String(fecha.getDate()).padStart(2, '0');
+            fechaInput.value = `${year}-${month}-${day}`;
+        }
     }
     
     // Series
@@ -2061,7 +2127,7 @@ async function eliminarRegistro(registroId, botonElement) {
             const form = document.getElementById('form-nuevo-registro');
             if (form) {
                 form.reset();
-                form.querySelector('#fecha-registro').value = new Date().toISOString().split('T')[0];
+                form.querySelector('#fecha-registro').value = obtenerFechaLocal();
                 
                 // Cambiar el texto del botón de vuelta a "Guardar Registro"
                 const btnSubmit = form.querySelector('button[type="submit"]');
@@ -2167,40 +2233,82 @@ async function toggleCompletado(entrenoId, ejercicioId) {
         // Paso 1: Obtener ejercicios actuales de la lista en memoria
         const ejerciciosActuales = await obtenerEjerciciosDeEntreno(entrenoId);
         
+        // Verificar que no haya duplicados por ID (por seguridad)
+        const ejerciciosUnicos = [];
+        const idsVistos = new Set();
+        for (const ej of ejerciciosActuales) {
+            if (!idsVistos.has(ej.id)) {
+                idsVistos.add(ej.id);
+                ejerciciosUnicos.push(ej);
+            }
+        }
+        // Si había duplicados, usar el array limpio
+        const ejerciciosParaUsar = ejerciciosUnicos.length !== ejerciciosActuales.length ? ejerciciosUnicos : ejerciciosActuales;
+        
         // Buscar el ejercicio en la lista local
-        const ejercicio = ejerciciosActuales.find(e => e.id === ejercicioId);
+        const ejercicio = ejerciciosParaUsar.find(e => e.id === ejercicioId);
         if (!ejercicio) {
             console.error('Ejercicio no encontrado en la lista local');
             return;
         }
         
         // Paso 2: Invertir el estado localmente
-        const fechaHoy = new Date().toDateString();
+        // Usar formato YYYY-MM-DD para consistencia estricta
+        const fechaHoyString = obtenerFechaLocal();
         const fechaCompletadoActual = ejercicio.fechaCompletado || null;
-        const nuevoFechaCompletado = fechaCompletadoActual === fechaHoy ? null : fechaHoy;
         
-        // Actualizar el ejercicio en la lista local
+        // Normalizar fechaCompletadoActual a formato YYYY-MM-DD para comparación estricta
+        let fechaCompletadoString = null;
+        if (fechaCompletadoActual) {
+            if (typeof fechaCompletadoActual === 'string' && fechaCompletadoActual.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                // Ya está en formato YYYY-MM-DD
+                fechaCompletadoString = fechaCompletadoActual;
+            } else {
+                // Convertir a YYYY-MM-DD
+                fechaCompletadoString = obtenerFechaLocal(new Date(fechaCompletadoActual));
+            }
+        }
+        
+        // Invertir estado: si está completado hoy, desmarcar; si no, marcar como completado
+        const nuevoFechaCompletado = fechaCompletadoString === fechaHoyString ? null : fechaHoyString;
+        const estado = nuevoFechaCompletado !== null ? 'completado' : 'desmarcado';
+        
+        // Actualizar el ejercicio en la lista local (modificar propiedades, NO crear duplicados)
         ejercicio.fechaCompletado = nuevoFechaCompletado;
-        ejercicio.isCompletedToday = nuevoFechaCompletado === fechaHoy;
+        ejercicio.isCompletedToday = nuevoFechaCompletado === fechaHoyString;
         
-        // Paso 3: Actualizar la UI INMEDIATAMENTE
+        // Obtener datos del entreno para pasar a storage (usar array sin duplicados)
+        const totalEjercicios = ejerciciosParaUsar.length;
+        const entrenoNombre = entrenoActual ? entrenoActual.nombre : 'Entreno';
+        
+        // Paso 3: Actualizar la UI INMEDIATAMENTE (usar array sin duplicados)
         const onToggle = (id) => toggleCompletado(entrenoId, id);
-        renderizarListaEjercicios(ejerciciosActuales, null, eliminarEjercicio, mostrarVistaEjercicio, sustituirEjercicio, onToggle);
+        renderizarListaEjercicios(ejerciciosParaUsar, null, eliminarEjercicio, mostrarVistaEjercicio, sustituirEjercicio, onToggle);
         
         // Actualizar barra de progreso
         actualizarBarraProgreso();
         
         // Paso 4: Enviar a Firebase (sin await bloqueante)
-        toggleCompletadoEjercicio(entrenoId, ejercicioId).catch(error => {
+        toggleCompletadoEjercicio(entrenoId, ejercicioId, estado, entrenoNombre, totalEjercicios).catch(error => {
             // Si Firebase falla, revertir el cambio local
             console.error('Error al toggle completado en Firebase:', error);
             
-            // Revertir el cambio
+            // Revertir el cambio (restaurar el valor original)
             ejercicio.fechaCompletado = fechaCompletadoActual;
-            ejercicio.isCompletedToday = fechaCompletadoActual === fechaHoy;
+            // Recalcular isCompletedToday con el valor original
+            const fechaHoyStringRevert = obtenerFechaLocal();
+            let fechaCompletadoStringRevert = null;
+            if (fechaCompletadoActual) {
+                if (typeof fechaCompletadoActual === 'string' && fechaCompletadoActual.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                    fechaCompletadoStringRevert = fechaCompletadoActual;
+                } else {
+                    fechaCompletadoStringRevert = obtenerFechaLocal(new Date(fechaCompletadoActual));
+                }
+            }
+            ejercicio.isCompletedToday = fechaCompletadoStringRevert === fechaHoyStringRevert;
             
-            // Volver a pintar con el estado original
-            renderizarListaEjercicios(ejerciciosActuales, null, eliminarEjercicio, mostrarVistaEjercicio, sustituirEjercicio, onToggle);
+            // Volver a pintar con el estado original (usar array sin duplicados)
+            renderizarListaEjercicios(ejerciciosParaUsar, null, eliminarEjercicio, mostrarVistaEjercicio, sustituirEjercicio, onToggle);
             
             // Actualizar barra de progreso
             actualizarBarraProgreso();
@@ -2453,14 +2561,164 @@ function manejarNavegacionBreadcrumbs(vista, action, param) {
     }
 }
 
+// Función para calcular la racha semanal
+// Función auxiliar para obtener el número de semana en formato ISO (ej: "2025-W47")
+// Acepta tanto objetos Date como strings de fecha "YYYY-MM-DD"
+function obtenerNumeroSemana(fecha) {
+    let d;
+    
+    // Si es un string "YYYY-MM-DD", convertirlo a Date
+    if (typeof fecha === 'string') {
+        // Usar 'T12:00:00' para evitar problemas de timezone
+        d = new Date(fecha + 'T12:00:00');
+    } else {
+        // Si es un objeto Date, crear una copia para no modificar la original
+        d = new Date(Date.UTC(fecha.getFullYear(), fecha.getMonth(), fecha.getDate()));
+    }
+    
+    // Ajustar al lunes de la semana (ISO 8601: semana empieza en lunes)
+    const dayNum = d.getUTCDay() || 7; // 0 (domingo) -> 7, 1-6 (lunes-sábado) -> 1-6
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+    
+    // Obtener el primer día del año
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    
+    // Calcular el número de semana
+    const weekNumber = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+    
+    // Formato: "YYYY-WNN"
+    return `${d.getUTCFullYear()}-W${String(weekNumber).padStart(2, '0')}`;
+}
+
+// Función principal para calcular la racha semanal
+// Recibe un array de objetos con datos enriquecidos: { fecha, cantidadCompletada, totalEjercicios, ... }
+function calcularRachaSemanal(listaDeDias) {
+    if (!listaDeDias || listaDeDias.length === 0) {
+        return 0;
+    }
+    
+    // 1. Filtrar solo días que cuentan para la racha (cantidadCompletada >= 3)
+    const diasQueCuentan = listaDeDias.filter(dia => {
+        const cantidad = typeof dia === 'string' ? 0 : (dia.cantidadCompletada || 0);
+        return cantidad >= 3; // Amarillo o Verde
+    });
+    
+    if (diasQueCuentan.length === 0) {
+        return 0;
+    }
+    
+    // 2. Extraer fechas y eliminar duplicados
+    const fechasUnicas = [...new Set(diasQueCuentan.map(dia => typeof dia === 'string' ? dia : dia.fecha))];
+    
+    // 3. Ordenar fechas de más reciente a más antigua
+    fechasUnicas.sort((a, b) => b.localeCompare(a));
+    
+    // 4. Agrupar fechas por semana (usando formato ISO: "2025-W47")
+    const semanasMap = new Map();
+    fechasUnicas.forEach(fechaString => {
+        const claveSemana = obtenerNumeroSemana(fechaString);
+        
+        if (!semanasMap.has(claveSemana)) {
+            semanasMap.set(claveSemana, new Set());
+        }
+        semanasMap.get(claveSemana).add(fechaString);
+    });
+    
+    // 5. Obtener la semana actual
+    const hoy = new Date();
+    const claveSemanaActual = obtenerNumeroSemana(hoy);
+    
+    // 6. Convertir Map a Array y ordenar semanas de más reciente a más antigua
+    const semanasOrdenadas = Array.from(semanasMap.entries()).sort((a, b) => {
+        const [añoA, semanaA] = a[0].split('-W').map(Number);
+        const [añoB, semanaB] = b[0].split('-W').map(Number);
+        if (añoA !== añoB) return añoB - añoA;
+        return semanaB - semanaA;
+    });
+    
+    // 7. Calcular racha desde la semana actual (o inmediatamente anterior) hacia atrás
+    let racha = 0;
+    let encontroSemanaActual = false;
+    
+    for (const [claveSemana, diasSet] of semanasOrdenadas) {
+        const diasEnSemana = diasSet.size; // Contar días únicos que cuentan para racha
+        
+        const esSemanaActual = claveSemana === claveSemanaActual;
+        
+        if (esSemanaActual) {
+            encontroSemanaActual = true;
+            // Semana actual: si tiene >= 4 días, cuenta. Si no, no rompe la racha (todavía estás a tiempo)
+            if (diasEnSemana >= 4) {
+                racha++;
+            }
+        } else {
+            // Semanas pasadas
+            if (diasEnSemana >= 4) {
+                racha++;
+            } else {
+                // Si la semana pasada tiene < 4 días, se rompe la racha
+                if (encontroSemanaActual) {
+                    break; // STOP: se rompió la racha
+                }
+            }
+        }
+    }
+    
+    return racha;
+}
+
+// Función para actualizar nombres de entrenos (ejecutar una vez)
+async function actualizarNombresEntrenos() {
+    try {
+        const entrenos = await cargarEntrenos() || [];
+        
+        // Mapeo de nombres antiguos a nuevos
+        const mapeoNombres = {
+            'piernas-abdomen': 'Piernas',
+            'Piernas - Abdomen': 'Piernas',
+            'Piernas': 'Piernas', // Por si acaso
+            'Pecho - hombro - tricep - abdomen': 'Push',
+            'Pecho - hombro - Tricep - abdomen': 'Push',
+            'Pecho - hombro- Tricep - abdomen': 'Push', // Con espacio después del guion
+            'Espada - hombro - trisep': 'Pull',
+            'Espalda - hombro - tricep': 'Pull',
+            'Espalda - Hombro - Bisep': 'Pull', // Con mayúsculas
+            'Cola - lumbar - abdomen': 'Gluteos',
+            'Cola - Lumbar - Abdomen': 'Gluteos', // Con mayúsculas
+            'Gluteos - lumbar - abdomen': 'Gluteos'
+        };
+        
+        let actualizados = 0;
+        for (const entreno of entrenos) {
+            const nombreActual = entreno.nombre;
+            const nuevoNombre = mapeoNombres[nombreActual];
+            
+            if (nuevoNombre && nuevoNombre !== nombreActual) {
+                await actualizarNombreEntreno(entreno.id, nuevoNombre);
+                actualizados++;
+                console.log(`Actualizado: "${nombreActual}" → "${nuevoNombre}"`);
+            }
+        }
+        
+        if (actualizados > 0) {
+            console.log(`✅ Se actualizaron ${actualizados} nombres de entrenos`);
+        }
+    } catch (error) {
+        console.error('Error al actualizar nombres de entrenos:', error);
+    }
+}
+
 // Función para inicializar la aplicación
 async function initApp() {
     try {
+        // Actualizar nombres de entrenos (ejecutar una vez, luego comentar)
+        // await actualizarNombresEntrenos();
+        
         // Cargar entrenos desde Firestore
         const entrenos = await cargarEntrenos() || [];
         
         // Renderizar la vista completa del dashboard
-        renderizarDashboardView(entrenos, mostrarVistaEntreno, mostrarVistaBiblioteca);
+        renderizarDashboardView(entrenos, mostrarVistaEntreno);
         
         // Asegurar que solo el dashboard esté visible al cargar
         showView(getDashboardView());
@@ -2496,6 +2754,41 @@ async function initApp() {
             });
         }
         
+        // Delegación de eventos global para el botón volver flotante
+        document.addEventListener('click', (e) => {
+            const btn = e.target.closest('.btn-volver-flotante');
+            if (btn) {
+                // Lógica inteligente para saber a dónde volver según qué vista está visible
+                const entrenoView = document.getElementById('entreno-view');
+                const ejercicioView = document.getElementById('ejercicio-view');
+                const categoriaView = document.getElementById('categoria-ejercicios-view');
+                
+                if (entrenoView && entrenoView.style.display !== 'none') {
+                    showView(getDashboardView());
+                } else if (ejercicioView && ejercicioView.style.display !== 'none') {
+                    // Volver al entreno anterior
+                    if (entrenoActual) {
+                        mostrarVistaEntreno(entrenoActual);
+                    } else {
+                        showView(getDashboardView());
+                    }
+                } else if (categoriaView && categoriaView.style.display !== 'none') {
+                    mostrarVistaBiblioteca();
+                }
+            }
+        });
+        
+        // Delegación de eventos global para el botón "Añadir Ejercicio"
+        document.addEventListener('click', (e) => {
+            // Detectar clic en el botón Añadir (o sus hijos)
+            const btnAnadir = e.target.closest('#btn-anadir-ejercicio');
+            
+            if (btnAnadir && entrenoActual) {
+                // Llamar a la lógica de abrir el modal
+                manejarClicAnadirEjercicio();
+            }
+        });
+        
         // Configurar listeners de clic para los tabs (Floating Tab Bar)
         const navItems = document.querySelectorAll('.nav-item');
         navItems.forEach(tab => {
@@ -2508,6 +2801,8 @@ async function initApp() {
                     mostrarVistaBiblioteca();
                 } else if (viewId === 'perfil-view') {
                     mostrarVistaPerfil();
+                } else if (viewId === 'calendario-view') {
+                    mostrarVistaCalendario();
                 }
             });
         });

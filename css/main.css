@@ -41,7 +41,7 @@ body {
     padding: 16px;
     width: 100%;
     /* No min-height */
-    padding-bottom: 200px; /* Espacio para el menú fijo y botón */
+    padding-bottom: 80px; /* Espacio para el menú fijo */
     position: relative;
 }
 
@@ -115,7 +115,7 @@ h3 {
 @media (min-width: 768px) {
     .view {
         padding: 24px;
-        padding-bottom: 200px; /* Mantener espacio para el menú fijo */
+        padding-bottom: 80px; /* Espacio para el menú inferior */
         max-width: 1200px;
         margin: 0 auto;
     }

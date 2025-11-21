@@ -21,29 +21,6 @@ import {
     deleteObject
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js';
 
-// Función para guardar entrenos en Firestore
-export async function guardarEntrenos(entrenos) {
-    try {
-        const entrenosCollection = collection(db, 'entrenos');
-        
-        // Eliminar todos los entrenos existentes primero
-        const snapshot = await getDocs(entrenosCollection);
-        const deletePromises = snapshot.docs.map(docSnapshot => 
-            deleteDoc(doc(db, 'entrenos', docSnapshot.id))
-        );
-        await Promise.all(deletePromises);
-        
-        // Agregar los nuevos entrenos
-        const addPromises = entrenos.map(entreno => 
-            addDoc(entrenosCollection, entreno)
-        );
-        await Promise.all(addPromises);
-    } catch (error) {
-        console.error('Error al guardar entrenos en Firestore:', error);
-        throw error;
-    }
-}
-
 // Función para cargar entrenos desde Firestore
 export async function cargarEntrenos() {
     try {
@@ -71,6 +48,31 @@ export async function cargarEntrenos() {
         return entrenos;
     } catch (error) {
         console.error('Error al cargar entrenos desde Firestore:', error);
+        throw error;
+    }
+}
+
+// Función para actualizar el nombre de un entreno
+export async function actualizarNombreEntreno(entrenoId, nuevoNombre) {
+    try {
+        const entrenos = await cargarEntrenos();
+        if (!entrenos) {
+            throw new Error('No se pudieron cargar los entrenos');
+        }
+        
+        const entreno = entrenos.find(e => e.id === entrenoId);
+        if (!entreno) {
+            throw new Error(`Entreno con ID ${entrenoId} no encontrado`);
+        }
+        
+        const entrenoRef = doc(db, 'entrenos', entreno.firestoreId);
+        await updateDoc(entrenoRef, {
+            nombre: nuevoNombre
+        });
+        
+        return true;
+    } catch (error) {
+        console.error('Error al actualizar nombre del entreno:', error);
         throw error;
     }
 }
@@ -195,6 +197,29 @@ export async function obtenerEjerciciosDeEntreno(entrenoId) {
         
         const ejercicios = [];
         
+        // Cache de categorías para evitar múltiples consultas
+        const categoriasCache = new Map();
+        
+        // Función auxiliar para obtener el nombre de la categoría
+        const obtenerNombreCategoria = async (categoriaId) => {
+            if (!categoriaId) return '';
+            if (categoriasCache.has(categoriaId)) {
+                return categoriasCache.get(categoriaId);
+            }
+            try {
+                const categoriaRef = doc(db, 'categoriasMusculares', categoriaId);
+                const categoriaDoc = await getDoc(categoriaRef);
+                if (categoriaDoc.exists()) {
+                    const nombreCategoria = categoriaDoc.data().nombre || '';
+                    categoriasCache.set(categoriaId, nombreCategoria);
+                    return nombreCategoria;
+                }
+            } catch (error) {
+                console.error(`Error al obtener categoría ${categoriaId}:`, error);
+            }
+            return '';
+        };
+        
         // Procesar cada ejercicio del entreno
         for (const docSnapshot of snapshot.docs) {
             const data = docSnapshot.data();
@@ -212,11 +237,24 @@ export async function obtenerEjerciciosDeEntreno(entrenoId) {
                     const ejercicioBibliotecaRef = doc(db, `categoriasMusculares/${ejercicioEntreno.categoriaId}/ejercicios`, ejercicioEntreno.bibliotecaId);
                     const ejercicioBibliotecaDoc = await getDoc(ejercicioBibliotecaRef);
                     
+                    // Obtener nombre de la categoría
+                    const nombreCategoria = await obtenerNombreCategoria(ejercicioEntreno.categoriaId);
+                    
                     if (ejercicioBibliotecaDoc.exists()) {
                         const dataBiblioteca = ejercicioBibliotecaDoc.data();
                         // Combinar: nombre e imagenUrl de la biblioteca, pero registros y orden del entreno
                         const fechaCompletado = ejercicioEntreno.fechaCompletado || null;
-                        const fechaHoy = new Date().toDateString();
+                        const fechaHoyString = obtenerFechaLocal();
+                        // Normalizar fechaCompletado a formato YYYY-MM-DD para comparación
+                        let fechaCompletadoNormalizada = null;
+                        if (fechaCompletado) {
+                            if (typeof fechaCompletado === 'string' && fechaCompletado.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                                fechaCompletadoNormalizada = fechaCompletado;
+                            } else {
+                                // Si viene en otro formato, convertir a YYYY-MM-DD
+                                fechaCompletadoNormalizada = obtenerFechaLocal(new Date(fechaCompletado));
+                            }
+                        }
                         ejercicios.push({
                             id: ejercicioEntreno.id,
                             nombre: dataBiblioteca.nombre,
@@ -225,14 +263,25 @@ export async function obtenerEjerciciosDeEntreno(entrenoId) {
                             registros: ejercicioEntreno.registros, // Registros del entreno (pueden estar desactualizados, se sincronizan al escribir)
                             bibliotecaId: ejercicioEntreno.bibliotecaId,
                             categoriaId: ejercicioEntreno.categoriaId,
-                            fechaCompletado: fechaCompletado,
-                            isCompletedToday: fechaCompletado === fechaHoy, // Propiedad virtual
+                            nombreCategoria: nombreCategoria || '', // Nombre de la categoría
+                            fechaCompletado: fechaCompletadoNormalizada, // Guardar en formato YYYY-MM-DD
+                            isCompletedToday: fechaCompletadoNormalizada === fechaHoyString, // Propiedad virtual
                             isOrphan: false
                         });
                     } else {
                         // Si no existe en la biblioteca, marcar como huérfano
+                        const nombreCategoria = await obtenerNombreCategoria(ejercicioEntreno.categoriaId);
                         const fechaCompletado = ejercicioEntreno.fechaCompletado || null;
-                        const fechaHoy = new Date().toDateString();
+                        const fechaHoyString = obtenerFechaLocal();
+                        // Normalizar fechaCompletado a formato YYYY-MM-DD
+                        let fechaCompletadoNormalizada = null;
+                        if (fechaCompletado) {
+                            if (typeof fechaCompletado === 'string' && fechaCompletado.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                                fechaCompletadoNormalizada = fechaCompletado;
+                            } else {
+                                fechaCompletadoNormalizada = obtenerFechaLocal(new Date(fechaCompletado));
+                            }
+                        }
                         const nombreOriginal = data.nombre || 'Ejercicio no encontrado';
                         ejercicios.push({
                             id: ejercicioEntreno.id,
@@ -242,16 +291,27 @@ export async function obtenerEjerciciosDeEntreno(entrenoId) {
                             registros: ejercicioEntreno.registros,
                             bibliotecaId: ejercicioEntreno.bibliotecaId,
                             categoriaId: ejercicioEntreno.categoriaId,
-                            fechaCompletado: fechaCompletado,
-                            isCompletedToday: fechaCompletado === fechaHoy,
+                            nombreCategoria: nombreCategoria || '', // Nombre de la categoría
+                            fechaCompletado: fechaCompletadoNormalizada, // Guardar en formato YYYY-MM-DD
+                            isCompletedToday: fechaCompletadoNormalizada === fechaHoyString,
                             isOrphan: true // Marcar como huérfano
                         });
                     }
                 } catch (error) {
                     console.error(`Error al obtener ejercicio ${ejercicioEntreno.bibliotecaId} de la biblioteca:`, error);
                     // Si hay error, asumir que el ejercicio fue eliminado (marcar como huérfano)
+                    const nombreCategoria = await obtenerNombreCategoria(ejercicioEntreno.categoriaId);
                     const fechaCompletado = ejercicioEntreno.fechaCompletado || null;
-                    const fechaHoy = new Date().toDateString();
+                    const fechaHoyString = obtenerFechaLocal();
+                    // Normalizar fechaCompletado a formato YYYY-MM-DD
+                    let fechaCompletadoNormalizada = null;
+                    if (fechaCompletado) {
+                        if (typeof fechaCompletado === 'string' && fechaCompletado.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                            fechaCompletadoNormalizada = fechaCompletado;
+                        } else {
+                            fechaCompletadoNormalizada = obtenerFechaLocal(new Date(fechaCompletado));
+                        }
+                    }
                     const nombreOriginal = data.nombre || 'Error al cargar';
                     ejercicios.push({
                         id: ejercicioEntreno.id,
@@ -261,25 +321,37 @@ export async function obtenerEjerciciosDeEntreno(entrenoId) {
                         registros: ejercicioEntreno.registros,
                         bibliotecaId: ejercicioEntreno.bibliotecaId,
                         categoriaId: ejercicioEntreno.categoriaId,
-                        fechaCompletado: fechaCompletado,
-                        isCompletedToday: fechaCompletado === fechaHoy,
+                        nombreCategoria: nombreCategoria || '', // Nombre de la categoría
+                        fechaCompletado: fechaCompletadoNormalizada, // Guardar en formato YYYY-MM-DD
+                        isCompletedToday: fechaCompletadoNormalizada === fechaHoyString,
                         isOrphan: true // Marcar como huérfano
                     });
                 }
             } else {
                 // Ejercicio viejo sin bibliotecaId (creado manualmente), devolver tal cual
+                const nombreCategoria = ejercicioEntreno.categoriaId ? await obtenerNombreCategoria(ejercicioEntreno.categoriaId) : '';
                 const fechaCompletado = data.fechaCompletado || null;
-                const fechaHoy = new Date().toDateString();
+                const fechaHoyString = obtenerFechaLocal();
+                // Normalizar fechaCompletado a formato YYYY-MM-DD
+                let fechaCompletadoNormalizada = null;
+                if (fechaCompletado) {
+                    if (typeof fechaCompletado === 'string' && fechaCompletado.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                        fechaCompletadoNormalizada = fechaCompletado;
+                    } else {
+                        fechaCompletadoNormalizada = obtenerFechaLocal(new Date(fechaCompletado));
+                    }
+                }
                 ejercicios.push({
                     id: data.id,
                     nombre: data.nombre,
                     imagenUrl: data.imagenUrl,
                     imagenBase64: data.imagenUrl,
+                    nombreCategoria: nombreCategoria || '', // Nombre de la categoría
                     registros: data.registros || [],
                     bibliotecaId: null,
                     categoriaId: null,
-                    fechaCompletado: fechaCompletado,
-                    isCompletedToday: fechaCompletado === fechaHoy
+                    fechaCompletado: fechaCompletadoNormalizada, // Guardar en formato YYYY-MM-DD
+                    isCompletedToday: fechaCompletadoNormalizada === fechaHoyString
                 });
             }
         }
@@ -364,22 +436,29 @@ export async function agregarEjercicioAEntreno(entrenoId, ejercicio) {
     }
 }
 
+// Función auxiliar para obtener fecha local en formato YYYY-MM-DD
+export function obtenerFechaLocal(fecha = null) {
+    const ahora = fecha || new Date();
+    const year = ahora.getFullYear();
+    const month = String(ahora.getMonth() + 1).padStart(2, '0');
+    const day = String(ahora.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
 // Función para toggle del estado completado de un ejercicio
-export async function toggleCompletadoEjercicio(entrenoId, ejercicioId) {
+export async function toggleCompletadoEjercicio(entrenoId, ejercicioId, estado, entrenoNombre, totalEjercicios) {
     try {
-        // Obtener el firestoreId del entreno
+        // 1. Obtener el firestoreId del entreno
         const firestoreId = await obtenerFirestoreIdDeEntreno(entrenoId);
         
-        // Buscar el documento en Firestore
+        // 2. Buscar el documento del ejercicio en Firestore
         const ejerciciosCollection = collection(db, `entrenos/${firestoreId}/ejercicios`);
         const snapshot = await getDocs(ejerciciosCollection);
         
         let docId = null;
-        let ejercicioExistente = null;
         snapshot.forEach(docSnapshot => {
             if (docSnapshot.data().id === ejercicioId) {
                 docId = docSnapshot.id;
-                ejercicioExistente = docSnapshot.data();
             }
         });
         
@@ -387,20 +466,56 @@ export async function toggleCompletadoEjercicio(entrenoId, ejercicioId) {
             throw new Error('Ejercicio no encontrado');
         }
         
-        // Determinar el nuevo valor de fechaCompletado
-        const fechaHoy = new Date().toDateString();
-        const fechaCompletadoActual = ejercicioExistente.fechaCompletado || null;
-        const nuevoFechaCompletado = fechaCompletadoActual === fechaHoy ? null : fechaHoy;
-        
-        // Actualizar el documento
+        // 3. Referencia al ejercicio dentro del entreno
         const ejercicioRef = doc(db, `entrenos/${firestoreId}/ejercicios/${docId}`);
+        
+        // 4. Determinar la fecha (String local)
+        // Si estado es 'completado' (marcado) -> fecha de hoy. Si no -> null.
+        const fechaHoy = new Date();
+        const fechaString = obtenerFechaLocal(fechaHoy);
+        const nuevaFecha = estado === 'completado' ? fechaString : null;
+        
+        // 5. ACTUALIZAR EL EJERCICIO (Para el Checklist)
         await updateDoc(ejercicioRef, {
-            fechaCompletado: nuevoFechaCompletado
+            fechaCompletado: nuevaFecha
         });
         
-        return nuevoFechaCompletado !== null;
+        // 6. ACTUALIZAR EL HISTORIAL DEL DÍA (Para el Calendario)
+        // Solo si tenemos el nombre y el total (si no, es un toggle rápido que no afecta historial global)
+        if (entrenoNombre && totalEjercicios) {
+            const historialRef = doc(db, 'historialDias', fechaString);
+            const historialSnap = await getDoc(historialRef);
+            
+            let cantidadActual = 0;
+            
+            if (historialSnap.exists()) {
+                cantidadActual = historialSnap.data().cantidadCompletada || 0;
+            }
+            
+            // Calcular nueva cantidad
+            let nuevaCantidad = estado === 'completado' ? cantidadActual + 1 : cantidadActual - 1;
+            if (nuevaCantidad < 0) nuevaCantidad = 0;
+            
+            // Guardar o Borrar el día
+            if (nuevaCantidad > 0) {
+                await setDoc(historialRef, {
+                    fecha: fechaString,
+                    timestamp: new Date(fechaString + 'T12:00:00').getTime(),
+                    cantidadCompletada: nuevaCantidad,
+                    totalEjercicios: totalEjercicios,
+                    entrenoNombre: entrenoNombre
+                }, { merge: true });
+            } else {
+                // Si bajó a 0, borramos el día para que salga Rojo en el calendario
+                if (historialSnap.exists()) {
+                    await deleteDoc(historialRef);
+                }
+            }
+        }
+        
+        return nuevaFecha !== null;
     } catch (error) {
-        console.error('Error al toggle completado:', error);
+        console.error("Error en toggleCompletadoEjercicio:", error);
         throw error;
     }
 }
@@ -485,11 +600,26 @@ export async function actualizarEjercicioEnEntreno(entrenoId, ejercicioActualiza
         }
         
         // Actualizar en Firestore usando el firestoreId
+        // IMPORTANTE: Los registros deben tener fecha como string YYYY-MM-DD, no Date objects
+        const registrosParaGuardar = (ejercicioActualizado.registros || ejercicioExistente.registros || []).map(reg => {
+            // Asegurar que cada registro tenga fecha como string
+            if (reg && reg.fecha && typeof reg.fecha !== 'string') {
+                const regCopy = { ...reg };
+                const fechaObj = new Date(reg.fecha);
+                const year = fechaObj.getFullYear();
+                const month = String(fechaObj.getMonth() + 1).padStart(2, '0');
+                const day = String(fechaObj.getDate()).padStart(2, '0');
+                regCopy.fecha = `${year}-${month}-${day}`;
+                return regCopy;
+            }
+            return reg;
+        });
+        
         const ejercicioRef = doc(db, `entrenos/${firestoreId}/ejercicios/${docId}`);
         await updateDoc(ejercicioRef, {
             nombre: ejercicioActualizado.nombre,
             imagenUrl: imagenUrl,
-            registros: ejercicioActualizado.registros || ejercicioExistente.registros || []
+            registros: registrosParaGuardar
         });
     } catch (error) {
         console.error('Error al actualizar ejercicio en Firestore:', error);
@@ -578,6 +708,9 @@ export async function obtenerEjercicio(entrenoId, ejercicioId) {
 // Función para agregar registro a un ejercicio
 export async function agregarRegistroAEjercicio(entrenoId, ejercicioId, nuevoRegistro) {
     try {
+        // IMPORTANTE: nuevoRegistro.fecha debe venir como string YYYY-MM-DD directamente del input
+        // NO convertir a Date antes de guardar
+        
         // Obtener el ejercicio actual
         const ejercicio = await obtenerEjercicio(entrenoId, ejercicioId);
         if (!ejercicio) {
@@ -586,6 +719,16 @@ export async function agregarRegistroAEjercicio(entrenoId, ejercicioId, nuevoReg
         
         // Agregar ID único al registro
         nuevoRegistro.id = Date.now();
+        
+        // Asegurar que la fecha sea string (no Date object)
+        if (nuevoRegistro.fecha && typeof nuevoRegistro.fecha !== 'string') {
+            // Si por alguna razón viene como Date, convertir a string YYYY-MM-DD
+            const fechaObj = new Date(nuevoRegistro.fecha);
+            const year = fechaObj.getFullYear();
+            const month = String(fechaObj.getMonth() + 1).padStart(2, '0');
+            const day = String(fechaObj.getDate()).padStart(2, '0');
+            nuevoRegistro.fecha = `${year}-${month}-${day}`;
+        }
         
         // Inicializar array de registros si no existe
         const registros = ejercicio.registros || [];
@@ -668,6 +811,9 @@ export async function eliminarRegistroDeEjercicio(entrenoId, ejercicioId, regist
 // Función para actualizar registro en un ejercicio
 export async function actualizarRegistroEnEjercicio(entrenoId, ejercicioId, registroId, datosActualizados) {
     try {
+        // IMPORTANTE: datosActualizados.fecha debe venir como string YYYY-MM-DD directamente del input
+        // NO convertir a Date antes de guardar
+        
         // Obtener el ejercicio actual
         const ejercicio = await obtenerEjercicio(entrenoId, ejercicioId);
         if (!ejercicio) {
@@ -676,6 +822,16 @@ export async function actualizarRegistroEnEjercicio(entrenoId, ejercicioId, regi
         
         // Mantener el ID original
         datosActualizados.id = registroId;
+        
+        // Asegurar que la fecha sea string (no Date object)
+        if (datosActualizados.fecha && typeof datosActualizados.fecha !== 'string') {
+            // Si por alguna razón viene como Date, convertir a string YYYY-MM-DD
+            const fechaObj = new Date(datosActualizados.fecha);
+            const year = fechaObj.getFullYear();
+            const month = String(fechaObj.getMonth() + 1).padStart(2, '0');
+            const day = String(fechaObj.getDate()).padStart(2, '0');
+            datosActualizados.fecha = `${year}-${month}-${day}`;
+        }
         
         // Actualizar el registro en el array
         const registros = ejercicio.registros || [];
@@ -1076,13 +1232,14 @@ export async function obtenerPerfil() {
 // Función auxiliar para convertir fecha YYYY-MM-DD a timestamp sin problemas de timezone
 function fechaStringATimestamp(fechaString) {
     if (!fechaString) return Date.now();
-    // Si la fecha viene como YYYY-MM-DD, crear Date en UTC para evitar problemas de timezone
+    // Si la fecha viene como YYYY-MM-DD, crear Date con mediodía local para evitar problemas de timezone
     const partes = fechaString.split('-');
     if (partes.length === 3) {
         const año = parseInt(partes[0], 10);
         const mes = parseInt(partes[1], 10) - 1; // Mes es 0-indexed
         const dia = parseInt(partes[2], 10);
-        return new Date(Date.UTC(año, mes, dia)).getTime();
+        // Usar mediodía local para evitar cambios de día por zona horaria
+        return new Date(año, mes, dia, 12, 0, 0).getTime();
     }
     return new Date(fechaString).getTime();
 }
@@ -1091,7 +1248,15 @@ function fechaStringATimestamp(fechaString) {
 export async function guardarMedicion(datos) {
     try {
         // Guardar la fecha como string YYYY-MM-DD directamente, sin conversión a ISO
-        const fechaString = datos.fecha || new Date().toISOString().split('T')[0];
+        // Si no viene fecha, usar fecha local
+        let fechaString = datos.fecha;
+        if (!fechaString) {
+            const ahora = new Date();
+            const year = ahora.getFullYear();
+            const month = String(ahora.getMonth() + 1).padStart(2, '0');
+            const day = String(ahora.getDate()).padStart(2, '0');
+            fechaString = `${year}-${month}-${day}`;
+        }
         
         const medicionData = {
             fecha: fechaString,
@@ -1140,7 +1305,15 @@ export async function actualizarMedicion(id, datos) {
     try {
         const medicionRef = doc(db, 'historialCorporal', id);
         // Guardar la fecha como string YYYY-MM-DD directamente, sin conversión a ISO
-        const fechaString = datos.fecha || new Date().toISOString().split('T')[0];
+        // Si no viene fecha, usar fecha local
+        let fechaString = datos.fecha;
+        if (!fechaString) {
+            const ahora = new Date();
+            const year = ahora.getFullYear();
+            const month = String(ahora.getMonth() + 1).padStart(2, '0');
+            const day = String(ahora.getDate()).padStart(2, '0');
+            fechaString = `${year}-${month}-${day}`;
+        }
         
         const medicionData = {
             fecha: fechaString,
@@ -1359,6 +1532,39 @@ export async function eliminarEjercicioBiblioteca(id) {
         await deleteDoc(ejercicioRef);
     } catch (error) {
         console.error('Error al eliminar ejercicio de la biblioteca:', error);
+        throw error;
+    }
+}
+
+// ========== HISTORIAL DE DÍAS ENTRENADOS ==========
+
+// Función para obtener todos los días entrenados con datos enriquecidos
+export async function obtenerDiasEntrenados() {
+    try {
+        const historialCollection = collection(db, 'historialDias');
+        // NO usar orderBy('timestamp') porque los documentos antiguos pueden no tener ese campo
+        // Simplemente obtener todos los documentos y ordenar por el ID (que es la fecha)
+        const snapshot = await getDocs(historialCollection);
+        
+        const dias = [];
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            dias.push({
+                fecha: doc.id, // El ID del documento es la fecha (YYYY-MM-DD)
+                cantidadCompletada: data.cantidadCompletada || 0,
+                totalEjercicios: data.totalEjercicios || 0,
+                entrenoNombre: data.entrenoNombre || 'Entreno',
+                porcentaje: data.porcentaje || 0,
+                timestamp: data.timestamp || null
+            });
+        });
+        
+        // Ordenar fechas de más reciente a más antigua (el ID es YYYY-MM-DD, así que se ordena lexicográficamente)
+        dias.sort((a, b) => b.fecha.localeCompare(a.fecha));
+        
+        return dias;
+    } catch (error) {
+        console.error('Error al obtener días entrenados:', error);
         throw error;
     }
 }
