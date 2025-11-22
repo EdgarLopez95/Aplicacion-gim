@@ -24,25 +24,32 @@
 }
 
 html, body {
-    height: 100%;
-    overflow-x: hidden; /* Previene scroll horizontal accidental */
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%; /* Fijo */
+    overflow: hidden; /* PROHIBIDO hacer scroll en el body */
+    position: fixed; /* Ancla la pantalla para evitar rebotes en iOS */
 }
 
 body {
     font-family: 'Inter', 'Roboto', 'system-ui', -apple-system, BlinkMacSystemFont, 'Segoe UI', Oxygen, Ubuntu, Cantarell, sans-serif;
     background-color: var(--bg-primary);
     color: var(--text-primary);
-    min-height: 100vh; /* El body SÍ debe llenar la pantalla */
     line-height: 1.6;
 }
 
 .view {
     display: none;
-    padding: 16px;
     width: 100%;
-    /* No min-height */
-    padding-bottom: 80px; /* Espacio para el menú fijo */
-    position: relative;
+    height: 100dvh; /* Altura Dinámica que respeta las barras del navegador */
+    overflow-y: auto; /* El scroll ocurre AQUÍ dentro */
+    -webkit-overflow-scrolling: touch; /* Scroll suave en iOS */
+    position: absolute; /* Para que se superpongan correctamente */
+    top: 0;
+    left: 0;
+    padding: 16px;
+    padding-bottom: 90px; /* Justo el alto de la barra de navegación */
 }
 
 .view.active {
@@ -52,8 +59,8 @@ body {
 
 .main-container {
     width: 100%;
-    max-width: 900px;
-    margin: 0 auto;
+    height: 100%;
+    position: relative; /* Para que las vistas absolutas se posicionen correctamente */
     /* Solo limita el ancho, el padding-bottom está en .view */
 }
 
@@ -88,7 +95,7 @@ h3 {
     top: 0;
     left: 0;
     width: 100vw;
-    height: 100vh;
+    height: 100dvh; /* Usar altura dinámica */
     background-color: var(--bg-primary);
     display: flex;
     align-items: center;
@@ -115,9 +122,7 @@ h3 {
 @media (min-width: 768px) {
     .view {
         padding: 24px;
-        padding-bottom: 80px; /* Espacio para el menú inferior */
-        max-width: 1200px;
-        margin: 0 auto;
+        padding-bottom: 90px; /* Justo el alto de la barra de navegación */
     }
 
     h1 {

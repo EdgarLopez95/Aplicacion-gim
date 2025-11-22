@@ -3,8 +3,9 @@
 /* Dashboard View - Mobile First */
 #dashboard-view {
     gap: 0;
-    overflow: hidden; /* Prevenir scroll */
-    height: 100vh;
+    overflow-y: auto; /* Permitir scroll interno */
+    -webkit-overflow-scrolling: touch; /* Scroll suave en iOS */
+    height: 100dvh; /* Usar altura dinámica */
     padding: 16px 0 0 0; /* Solo padding superior, sin padding inferior */
     padding-bottom: 0; /* Sin padding extra */
     display: flex;
@@ -29,8 +30,8 @@
     grid-template-rows: 1fr 1fr;    /* 2 Filas iguales */
     gap: 12px;
     
-    /* Calcular altura: 100vh - TabBar(~80px) - Título(~50px) - Padding superior(~16px) - Padding inferior(~16px) */
-    height: calc(100vh - 162px);
+    /* Calcular altura: 100dvh - TabBar(~80px) - Título(~50px) - Padding superior(~16px) - Padding inferior(~16px) */
+    height: calc(100dvh - 162px);
     min-height: 400px; /* Para que no se rompa en pantallas muy pequeñas */
     
     padding: 0 16px 16px 16px; /* Ajusta márgenes laterales */
@@ -216,7 +217,7 @@
 
     .dashboard-container {
         gap: 16px;
-        height: calc(100vh - 180px);
+        height: calc(100dvh - 180px);
     }
 
     /* Lista de ejercicios en vista de categorías - espaciado más compacto en tablet/desktop */
@@ -229,7 +230,7 @@
 @media (min-width: 1024px) {
     .dashboard-container {
         gap: 20px;
-        height: calc(100vh - 190px);
+        height: calc(100dvh - 190px);
     }
 }
 

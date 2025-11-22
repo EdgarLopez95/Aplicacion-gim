@@ -2756,25 +2756,24 @@ async function initApp() {
         
         // Delegación de eventos global para el botón volver flotante
         document.addEventListener('click', (e) => {
-            const btn = e.target.closest('.btn-volver-flotante');
-            if (btn) {
-                // Lógica inteligente para saber a dónde volver según qué vista está visible
-                const entrenoView = document.getElementById('entreno-view');
-                const ejercicioView = document.getElementById('ejercicio-view');
-                const categoriaView = document.getElementById('categoria-ejercicios-view');
-                
-                if (entrenoView && entrenoView.style.display !== 'none') {
-                    showView(getDashboardView());
-                } else if (ejercicioView && ejercicioView.style.display !== 'none') {
-                    // Volver al entreno anterior
-                    if (entrenoActual) {
-                        mostrarVistaEntreno(entrenoActual);
-                    } else {
-                        showView(getDashboardView());
-                    }
-                } else if (categoriaView && categoriaView.style.display !== 'none') {
-                    mostrarVistaBiblioteca();
+            const btnVolver = e.target.closest('.btn-volver-flotante');
+            if (!btnVolver) return;
+            
+            // Detectar vista activa buscando la clase .active
+            const vistaActiva = document.querySelector('.view.active');
+            if (!vistaActiva) return;
+            
+            if (vistaActiva.id === 'entreno-view') {
+                mostrarVistaDashboard();
+            } else if (vistaActiva.id === 'ejercicio-view') {
+                // Volver al entreno guardado
+                if (entrenoActual) {
+                    mostrarVistaEntreno(entrenoActual);
+                } else {
+                    mostrarVistaDashboard();
                 }
+            } else if (vistaActiva.id === 'categoria-ejercicios-view') {
+                mostrarVistaBiblioteca();
             }
         });
         
