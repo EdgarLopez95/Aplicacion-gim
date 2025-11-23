@@ -1879,19 +1879,7 @@ async function mostrarVistaEjercicio(ejercicioId) {
     // 4. Configurar event listeners
     configurarEventListenersEjercicioView();
     
-    // Configurar botón volver flotante DESPUÉS de que el HTML esté en el DOM
-    setTimeout(() => {
-        const btnVolver = document.getElementById('btn-volver-float');
-        if (btnVolver) {
-            btnVolver.addEventListener('click', () => {
-                if (entrenoActual) {
-                    mostrarVistaEntreno(entrenoActual);
-                } else {
-                    showView(getDashboardView());
-                }
-            });
-        }
-    }, 0);
+    // El botón volver ahora se maneja con delegación de eventos global en initApp
 }
 
 // Función para configurar event listeners de la vista de ejercicio
@@ -2755,25 +2743,64 @@ async function initApp() {
         }
         
         // Delegación de eventos global para el botón volver flotante
-        document.addEventListener('click', (e) => {
+        document.body.addEventListener('click', (e) => {
+            // 1. Detectar si el clic fue en el botón volver (o en su ícono interno)
             const btnVolver = e.target.closest('.btn-volver-flotante');
-            if (!btnVolver) return;
             
-            // Detectar vista activa buscando la clase .active
-            const vistaActiva = document.querySelector('.view.active');
-            if (!vistaActiva) return;
-            
-            if (vistaActiva.id === 'entreno-view') {
-                mostrarVistaDashboard();
-            } else if (vistaActiva.id === 'ejercicio-view') {
-                // Volver al entreno guardado
-                if (entrenoActual) {
-                    mostrarVistaEntreno(entrenoActual);
+            if (btnVolver) {
+                e.preventDefault(); // Prevenir comportamientos raros
+                e.stopPropagation(); // Evitar que el evento se propague
+                
+                console.log('Clic en volver detectado');
+                
+                // 2. Detectar qué vista está activa usando display en lugar de .active
+                const entrenoView = document.getElementById('entreno-view');
+                const ejercicioView = document.getElementById('ejercicio-view');
+                const categoriaEjerciciosView = document.getElementById('categoria-ejercicios-view');
+                
+                // Función auxiliar para verificar si una vista está visible
+                const isViewVisible = (view) => {
+                    if (!view) return false;
+                    const style = window.getComputedStyle(view);
+                    return style.display !== 'none' && (style.display === 'flex' || style.display === 'block');
+                };
+                
+                // Lógica de navegación
+                if (isViewVisible(entrenoView)) {
+                    console.log('Navegando desde entreno-view a dashboard');
+                    // Cargar y mostrar el dashboard
+                    cargarEntrenos().then(entrenos => {
+                        renderizarDashboardView(entrenos, mostrarVistaEntreno);
+                        showView(getDashboardView());
+                    }).catch(error => {
+                        console.error('Error al cargar entrenos:', error);
+                        showView(getDashboardView());
+                    });
+                } 
+                else if (isViewVisible(ejercicioView)) {
+                    console.log('Navegando desde ejercicio-view a entreno');
+                    // Volver al entreno actual
+                    if (entrenoActual) {
+                        mostrarVistaEntreno(entrenoActual);
+                    } else {
+                        // Fallback: cargar y mostrar dashboard
+                        cargarEntrenos().then(entrenos => {
+                            renderizarDashboardView(entrenos, mostrarVistaEntreno);
+                            showView(getDashboardView());
+                        }).catch(error => {
+                            console.error('Error al cargar entrenos:', error);
+                            showView(getDashboardView());
+                        });
+                    }
+                } 
+                else if (isViewVisible(categoriaEjerciciosView)) {
+                    console.log('Navegando desde categoria-ejercicios-view a biblioteca');
+                    mostrarVistaBiblioteca(); // Volver a la lista de categorías
                 } else {
-                    mostrarVistaDashboard();
+                    console.log('Vista activa no detectada. Entreno:', isViewVisible(entrenoView), 
+                                'Ejercicio:', isViewVisible(ejercicioView), 
+                                'Categoria:', isViewVisible(categoriaEjerciciosView));
                 }
-            } else if (vistaActiva.id === 'categoria-ejercicios-view') {
-                mostrarVistaBiblioteca();
             }
         });
         

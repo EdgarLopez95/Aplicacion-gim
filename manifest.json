@@ -1,0 +1,21 @@
+{
+  "name": "Mi Entreno",
+  "short_name": "Entreno",
+  "start_url": "/index.html",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#DFFF00",
+  "icons": [
+    {
+      "src": "images/favicon.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "images/favicon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
+

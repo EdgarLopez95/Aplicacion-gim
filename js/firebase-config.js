@@ -2,7 +2,7 @@
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 
-import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, enableIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 import { getStorage } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
 
@@ -39,4 +39,40 @@ const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 
 export const storage = getStorage(app);
+
+
+
+// ACTIVAR PERSISTENCIA OFFLINE (IndexedDB)
+
+// Esto permite que la app funcione sin conexión y cargue instantáneamente desde caché
+
+enableIndexedDbPersistence(db)
+
+    .then(() => {
+
+        console.log('✅ Persistencia offline activada. La app funcionará sin conexión.');
+
+    })
+
+    .catch((err) => {
+
+        if (err.code == 'failed-precondition') {
+
+            // Múltiples pestañas abiertas, solo una puede tener persistencia habilitada
+
+            console.warn('⚠️ La persistencia falló: Probablemente múltiples pestañas abiertas. Solo una pestaña puede tener persistencia activa.');
+
+        } else if (err.code == 'unimplemented') {
+
+            // El navegador no soporta persistencia (muy raro en navegadores modernos)
+
+            console.warn('⚠️ El navegador no soporta persistencia offline.');
+
+        } else {
+
+            console.error('❌ Error al activar persistencia offline:', err);
+
+        }
+
+    });
 

@@ -72,9 +72,10 @@
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    z-index: 100;
+    z-index: 9999; /* Z-index extremo para asegurar que esté por encima de todo */
     transition: all .25s ease;
     box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+    pointer-events: auto; /* Asegurar que pueda recibir clics */
 }
 
 /* Ícono (hereda los colores de tu app) */
