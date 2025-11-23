@@ -1,18 +1,19 @@
 const CACHE_NAME = 'gimnasio-app-cache-v2'; // Incrementar versión al actualizar
 
 // Archivos estáticos de la App Shell (se cachean al instalar)
+// Rutas relativas para funcionar en subcarpetas (GitHub Pages)
 const APP_SHELL_FILES = [
-    '/',
-    '/index.html',
-    '/css/main.css',
-    '/css/components.css',
-    '/css/views.css',
-    '/js/main.js',
-    '/js/ui.js',
-    '/js/storage.js',
-    '/js/firebase-config.js',
-    '/manifest.json',
-    '/images/favicon.png'
+    './',
+    './index.html',
+    './css/main.css',
+    './css/components.css',
+    './css/views.css',
+    './js/main.js',
+    './js/ui.js',
+    './js/storage.js',
+    './js/firebase-config.js',
+    './manifest.json',
+    './images/favicon.png'
 ];
 
 // URLs de Firebase Storage (imágenes)
@@ -71,9 +72,17 @@ self.addEventListener('fetch', event => {
     const url = new URL(event.request.url);
     
     // 1. Archivos estáticos de la App Shell (HTML, CSS, JS)
+    // Normalizar rutas para comparar correctamente (eliminar ./ y /)
+    const normalizePath = (path) => {
+        return path.replace(/^\.\//, '').replace(/^\//, '');
+    };
+    
+    const requestPath = normalizePath(url.pathname);
     const isAppShellFile = APP_SHELL_FILES.some(file => {
-        const path = url.pathname;
-        return path === file || path === file + '/';
+        const normalizedFile = normalizePath(file);
+        return requestPath === normalizedFile || 
+               requestPath === normalizedFile + '/' ||
+               requestPath.endsWith('/' + normalizedFile);
     });
     
     // 2. Imágenes de Firebase Storage
@@ -108,7 +117,7 @@ self.addEventListener('fetch', event => {
                     }).catch(() => {
                         // Si falla la red y no hay caché, devuelve una respuesta offline básica
                         if (event.request.destination === 'document') {
-                            return caches.match('/index.html');
+                            return caches.match('./index.html') || caches.match('index.html');
                         }
                     });
                 });

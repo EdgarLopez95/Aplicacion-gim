@@ -2839,7 +2839,7 @@ async function initApp() {
         
         // Registrar el Service Worker
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/sw.js')
+            navigator.serviceWorker.register('./sw.js')
                 .then(() => {
                     // Service Worker registrado
                 })
