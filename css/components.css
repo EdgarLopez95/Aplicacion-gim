@@ -569,7 +569,7 @@
 .modal-buttons {
     display: flex;
     gap: 12px;
-    margin-top: 24px;
+    
 }
 
 .modal-buttons .btn {
@@ -914,9 +914,8 @@
 .modal-seleccion-container {
     max-height: 450px;
     overflow-y: auto;
-    margin: 20px 0;
     padding-right: 4px;
-    padding-bottom: 20px;
+    
 }
 
 /* Scrollbar personalizado para el contenedor */
@@ -1070,7 +1069,7 @@
 
 /* Botón cancelar del modal de selección */
 #modal-seleccion-ejercicio .modal-buttons {
-    margin-top: 24px;
+  
     padding-top: 20px;
     padding-bottom: 8px;
     border-top: 1px solid var(--bg-secondary);

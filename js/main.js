@@ -111,20 +111,50 @@ async function manejarClicAnadirEjercicio() {
     try {
         const ejerciciosPorCategoria = await obtenerTodosLosEjerciciosDeBiblioteca();
         
-        // Paso 3: Actualizar modal con los datos reales
+        // Paso 3: Actualizar modal con los datos reales (siempre se ejecuta, incluso si está vacío)
         renderizarModalSeleccionEjercicio(ejerciciosPorCategoria);
         
-        // Configurar listeners del modal de selección
-        configurarEventListenersModalSeleccion();
+        // Si no hay ejercicios, mostrar mensaje
+        if (!ejerciciosPorCategoria || ejerciciosPorCategoria.length === 0) {
+            const modalContent = modalSeleccion?.querySelector('.modal-content');
+            if (modalContent) {
+                const existingContent = modalContent.innerHTML;
+                // Añadir mensaje si no hay ejercicios
+                if (!existingContent.includes('No se encontraron ejercicios')) {
+                    modalContent.innerHTML = `
+                        <h3>SELECCIONAR EJERCICIO</h3>
+                        <p style="text-align: center; padding: 20px; color: var(--text-secondary);">
+                            No se encontraron ejercicios en la biblioteca.
+                        </p>
+                        <div class="modal-buttons">
+                            <button type="button" id="btn-cerrar-seleccion" class="btn btn-secondary">Cancelar</button>
+                        </div>
+                    `;
+                    // Reconfigurar el listener del botón cerrar
+                    const btnCerrar = document.getElementById('btn-cerrar-seleccion');
+                    if (btnCerrar) {
+                        btnCerrar.addEventListener('click', function() {
+                            modalSeleccion.style.display = 'none';
+                        });
+                    }
+                }
+            }
+        } else {
+            // Configurar listeners del modal de selección solo si hay ejercicios
+            configurarEventListenersModalSeleccion();
+        }
     } catch (error) {
-        console.error('Error al cargar ejercicios de la biblioteca:', error);
-        // Mostrar error en el modal
+        // Este catch nunca debería ejecutarse ahora (la función siempre devuelve array)
+        // Pero lo mantenemos por seguridad
+        console.error('Error inesperado al cargar ejercicios de la biblioteca:', error);
+        
+        // Mostrar mensaje en el modal
         const modalContent = modalSeleccion?.querySelector('.modal-content');
         if (modalContent) {
             modalContent.innerHTML = `
                 <h3>SELECCIONAR EJERCICIO</h3>
                 <p style="text-align: center; padding: 20px; color: var(--text-secondary);">
-                    Error al cargar los ejercicios de la biblioteca.
+                    No se encontraron ejercicios en la biblioteca.
                 </p>
                 <div class="modal-buttons">
                     <button type="button" id="btn-cerrar-seleccion" class="btn btn-secondary">Cancelar</button>
@@ -2364,36 +2394,61 @@ async function sustituirEjercicio(ejercicioId) {
             ejerciciosPorCategoria = await obtenerTodosLosEjerciciosDeBiblioteca();
         }
         
-        // Paso 3: Actualizar modal con los datos reales
+        // Paso 3: Actualizar modal con los datos reales (siempre se ejecuta, incluso si está vacío)
         renderizarModalSeleccionEjercicio(ejerciciosPorCategoria);
         
-        // Si hay una categoría específica, abrirla automáticamente
-        if (ejercicio.categoriaId && ejerciciosPorCategoria.length > 0) {
-            setTimeout(() => {
-                const categoriaIndex = ejerciciosPorCategoria.findIndex(item => item.categoria.id === ejercicio.categoriaId);
-                if (categoriaIndex >= 0) {
-                    const ejerciciosContainer = document.getElementById(`ejercicios-categoria-${categoriaIndex}`);
-                    const header = document.querySelector(`[data-categoria-index="${categoriaIndex}"]`);
-                    if (ejerciciosContainer && header) {
-                        ejerciciosContainer.classList.add('active');
-                        ejerciciosContainer.style.display = 'block';
-                        header.classList.add('active');
-                    }
+        // Si no hay ejercicios, mostrar mensaje
+        if (!ejerciciosPorCategoria || ejerciciosPorCategoria.length === 0) {
+            const modalContent = modalSeleccion?.querySelector('.modal-content');
+            if (modalContent) {
+                modalContent.innerHTML = `
+                    <h3>SELECCIONAR EJERCICIO</h3>
+                    <p style="text-align: center; padding: 20px; color: var(--text-secondary);">
+                        No se encontraron ejercicios en la biblioteca.
+                    </p>
+                    <div class="modal-buttons">
+                        <button type="button" id="btn-cerrar-seleccion" class="btn btn-secondary">Cancelar</button>
+                    </div>
+                `;
+                // Reconfigurar el listener del botón cerrar
+                const btnCerrar = document.getElementById('btn-cerrar-seleccion');
+                if (btnCerrar) {
+                    btnCerrar.addEventListener('click', function() {
+                        modalSeleccion.style.display = 'none';
+                    });
                 }
-            }, 100);
+            }
+        } else {
+            // Si hay una categoría específica, abrirla automáticamente
+            if (ejercicio.categoriaId && ejerciciosPorCategoria.length > 0) {
+                setTimeout(() => {
+                    const categoriaIndex = ejerciciosPorCategoria.findIndex(item => item.categoria.id === ejercicio.categoriaId);
+                    if (categoriaIndex >= 0) {
+                        const ejerciciosContainer = document.getElementById(`ejercicios-categoria-${categoriaIndex}`);
+                        const header = document.querySelector(`[data-categoria-index="${categoriaIndex}"]`);
+                        if (ejerciciosContainer && header) {
+                            ejerciciosContainer.classList.add('active');
+                            ejerciciosContainer.style.display = 'block';
+                            header.classList.add('active');
+                        }
+                    }
+                }, 100);
+            }
+            
+            // Configurar listeners del modal de selección para sustitución
+            configurarEventListenersModalSeleccionSustitucion(ejercicioId);
         }
-        
-        // Configurar listeners del modal de selección para sustitución
-        configurarEventListenersModalSeleccionSustitucion(ejercicioId);
     } catch (error) {
-        console.error('Error al cargar ejercicios de la biblioteca:', error);
+        // Este catch nunca debería ejecutarse ahora (la función siempre devuelve array)
+        // Pero lo mantenemos por seguridad
+        console.error('Error inesperado al cargar ejercicios de la biblioteca:', error);
         // Mostrar error en el modal
         const modalContent = modalSeleccion?.querySelector('.modal-content');
         if (modalContent) {
             modalContent.innerHTML = `
                 <h3>SELECCIONAR EJERCICIO</h3>
                 <p style="text-align: center; padding: 20px; color: var(--text-secondary);">
-                    Error al cargar los ejercicios de la biblioteca.
+                    No se encontraron ejercicios en la biblioteca.
                 </p>
                 <div class="modal-buttons">
                     <button type="button" id="btn-cerrar-seleccion" class="btn btn-secondary">Cancelar</button>
@@ -2696,6 +2751,76 @@ async function actualizarNombresEntrenos() {
     }
 }
 
+// Función para cachear imágenes usando mode: 'no-cors'
+// Esto crea respuestas "opaque" que SÍ se pueden cachear aunque no se puedan leer
+// Es la única forma de cachear imágenes de Firebase Storage sin configuración CORS
+async function cachearImagenesManualmente(entrenos) {
+    if (!('caches' in window) || !entrenos || entrenos.length === 0) {
+        return;
+    }
+    
+    try {
+        const cache = await caches.open('dynamic-v1');
+        const urlsParaCachear = [];
+        
+        // Recopilar todas las URLs de imágenes de entrenos
+        entrenos.forEach(entreno => {
+            if (entreno.imagen && entreno.imagen.startsWith('http')) {
+                urlsParaCachear.push(entreno.imagen);
+            }
+        });
+        
+        // También cachear la imagen de perfil del header
+        const profilePic = document.querySelector('.profile-pic');
+        if (profilePic && profilePic.src && profilePic.src.startsWith('http')) {
+            urlsParaCachear.push(profilePic.src);
+        }
+        
+        console.log('🖼️ Cacheando', urlsParaCachear.length, 'imágenes usando no-cors...');
+        
+        // Cachear cada imagen usando mode: 'no-cors'
+        // Esto crea respuestas "opaque" que SÍ se pueden cachear
+        const promesasCache = urlsParaCachear.map(async (url) => {
+            try {
+                // Verificar si ya está en caché
+                const cached = await cache.match(url);
+                if (cached) {
+                    console.log('✅ Imagen ya está en caché:', url);
+                    return;
+                }
+                
+                // Usar mode: 'no-cors' para evitar problemas de CORS
+                // Esto crea una respuesta "opaque" que SÍ se puede cachear
+                const response = await fetch(url, {
+                    mode: 'no-cors', // Clave: esto evita CORS pero crea respuesta "opaque"
+                    credentials: 'omit'
+                });
+                
+                // Las respuestas "opaque" siempre tienen status 0, pero se pueden cachear
+                if (response) {
+                    await cache.put(url, response);
+                    console.log('💾 Imagen cacheada exitosamente (opaque response):', url);
+                    
+                    // Verificar que se guardó
+                    const verificacion = await cache.match(url);
+                    if (verificacion) {
+                        console.log('✅ Verificación - Imagen confirmada en caché:', url);
+                    }
+                } else {
+                    console.warn('⚠️ No se pudo obtener respuesta para:', url);
+                }
+            } catch (error) {
+                console.warn('⚠️ Error al cachear imagen:', url, error);
+            }
+        });
+        
+        await Promise.allSettled(promesasCache);
+        console.log('✅ Proceso de cacheo de imágenes completado');
+    } catch (error) {
+        console.error('❌ Error al cachear imágenes manualmente:', error);
+    }
+}
+
 // Función para inicializar la aplicación
 async function initApp() {
     try {
@@ -2840,12 +2965,40 @@ async function initApp() {
         // Registrar el Service Worker
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('./sw.js')
-                .then(() => {
-                    // Service Worker registrado
+                .then(registration => {
+                    console.log('✅ Service Worker registrado correctamente:', registration.scope);
+                    
+                    // Verificar si hay una actualización disponible
+                    registration.addEventListener('updatefound', () => {
+                        const newWorker = registration.installing;
+                        console.log('🔄 Nueva versión del Service Worker encontrada');
+                        newWorker.addEventListener('statechange', () => {
+                            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                console.log('🔄 Nueva versión lista. Recarga la página para actualizar.');
+                            }
+                        });
+                    });
+                    
+                    // Cachear imágenes manualmente después de que el Service Worker esté listo
+                    // Hacemos fetch desde el contexto de la página para evitar problemas de CORS
+                    if (registration.active) {
+                        // Esperar un poco para que el SW esté completamente activo
+                        setTimeout(() => {
+                            cachearImagenesManualmente(entrenos);
+                        }, 1000);
+                    } else {
+                        registration.addEventListener('activate', () => {
+                            setTimeout(() => {
+                                cachearImagenesManualmente(entrenos);
+                            }, 1000);
+                        });
+                    }
                 })
                 .catch(error => {
-                    console.error('Error al registrar el Service Worker:', error);
+                    console.error('❌ Error al registrar el Service Worker:', error);
                 });
+        } else {
+            console.warn('⚠️ Service Worker no soportado en este navegador');
         }
     } catch (error) {
         console.error('Error al inicializar la aplicación:', error);

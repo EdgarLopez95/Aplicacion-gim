@@ -6,6 +6,10 @@ import {
     doc,
     getDocs,
     getDoc,
+    getDocsFromCache,
+    getDocFromCache,
+    getDocsFromServer,
+    getDocFromServer,
     addDoc,
     setDoc,
     updateDoc,
@@ -21,11 +25,123 @@ import {
     deleteObject
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js';
 
+// ============================================
+// FUNCIONES HELPER PARA OFFLINE-FIRST
+// ============================================
+
+/**
+ * Intenta obtener datos de la caché primero (rápido), luego de la red si es necesario
+ * Esto hace que la app sea instantánea cuando está offline
+ */
+export async function getDocsCacheFirst(queryRef) {
+    // Verificar si estamos online
+    const isOnline = navigator.onLine;
+    
+    try {
+        // SIEMPRE intentar primero desde caché (instantáneo, incluso si está online)
+        const cacheSnapshot = await getDocsFromCache(queryRef);
+        if (cacheSnapshot && !cacheSnapshot.empty) {
+            // Si hay datos en caché, devolverlos inmediatamente
+            // Si está online, actualizar en segundo plano
+            if (isOnline) {
+                getDocsFromServer(queryRef).catch(() => {
+                    // Ignorar errores de actualización en segundo plano
+                });
+            }
+            return cacheSnapshot;
+        }
+    } catch (error) {
+        // Si no hay caché, continuar
+    }
+    
+    // Si no hay caché y estamos online, intentar desde la red
+    if (isOnline) {
+        try {
+            return await getDocsFromServer(queryRef);
+        } catch (error) {
+            // Si la red falla, intentar caché de nuevo como fallback
+            try {
+                return await getDocsFromCache(queryRef);
+            } catch (cacheError) {
+                throw error;
+            }
+        }
+    }
+    
+    // Si estamos offline y no hay caché, devolver snapshot vacío
+    // Esto evita que la app se quede "pensando" esperando la red
+    // Crear un snapshot vacío con la estructura correcta
+    const emptySnapshot = {
+        empty: true,
+        size: 0,
+        docs: [],
+        forEach: function(callback) {
+            // No hacer nada, es un snapshot vacío
+        },
+        docChanges: function() {
+            return [];
+        },
+        metadata: {
+            fromCache: true,
+            hasPendingWrites: false
+        },
+        query: queryRef
+    };
+    return emptySnapshot;
+}
+
+/**
+ * Intenta obtener un documento de la caché primero, luego de la red
+ */
+export async function getDocCacheFirst(docRef) {
+    // Verificar si estamos online
+    const isOnline = navigator.onLine;
+    
+    try {
+        // SIEMPRE intentar primero desde caché (instantáneo, incluso si está online)
+        const cacheDoc = await getDocFromCache(docRef);
+        if (cacheDoc && cacheDoc.exists()) {
+            // Si hay datos en caché, devolverlos inmediatamente
+            // Si está online, actualizar en segundo plano
+            if (isOnline) {
+                getDocFromServer(docRef).catch(() => {
+                    // Ignorar errores de actualización en segundo plano
+                });
+            }
+            return cacheDoc;
+        }
+    } catch (error) {
+        // Si no hay caché, continuar
+    }
+    
+    // Si no hay caché y estamos online, intentar desde la red
+    if (isOnline) {
+        try {
+            return await getDocFromServer(docRef);
+        } catch (error) {
+            // Si la red falla, intentar caché de nuevo como fallback
+            try {
+                return await getDocFromCache(docRef);
+            } catch (cacheError) {
+                throw error;
+            }
+        }
+    }
+    
+    // Si estamos offline y no hay caché, devolver documento que no existe
+    // Esto evita que la app se quede "pensando" esperando la red
+    return {
+        exists: () => false,
+        data: () => undefined,
+        id: docRef.id
+    };
+}
+
 // Función para cargar entrenos desde Firestore
 export async function cargarEntrenos() {
     try {
         const entrenosCollection = collection(db, 'entrenos');
-        const snapshot = await getDocs(entrenosCollection);
+        const snapshot = await getDocsCacheFirst(entrenosCollection);
         
         if (snapshot.empty) {
             return null;
@@ -193,7 +309,7 @@ export async function obtenerEjerciciosDeEntreno(entrenoId) {
         
         const ejerciciosCollection = collection(db, `entrenos/${firestoreId}/ejercicios`);
         const q = query(ejerciciosCollection, orderBy('id', 'asc'));
-        const snapshot = await getDocs(q);
+        const snapshot = await getDocsCacheFirst(q);
         
         const ejercicios = [];
         
@@ -208,7 +324,7 @@ export async function obtenerEjerciciosDeEntreno(entrenoId) {
             }
             try {
                 const categoriaRef = doc(db, 'categoriasMusculares', categoriaId);
-                const categoriaDoc = await getDoc(categoriaRef);
+                const categoriaDoc = await getDocCacheFirst(categoriaRef);
                 if (categoriaDoc.exists()) {
                     const nombreCategoria = categoriaDoc.data().nombre || '';
                     categoriasCache.set(categoriaId, nombreCategoria);
@@ -235,7 +351,7 @@ export async function obtenerEjerciciosDeEntreno(entrenoId) {
             if (ejercicioEntreno.bibliotecaId && ejercicioEntreno.categoriaId) {
                 try {
                     const ejercicioBibliotecaRef = doc(db, `categoriasMusculares/${ejercicioEntreno.categoriaId}/ejercicios`, ejercicioEntreno.bibliotecaId);
-                    const ejercicioBibliotecaDoc = await getDoc(ejercicioBibliotecaRef);
+                    const ejercicioBibliotecaDoc = await getDocCacheFirst(ejercicioBibliotecaRef);
                     
                     // Obtener nombre de la categoría
                     const nombreCategoria = await obtenerNombreCategoria(ejercicioEntreno.categoriaId);
@@ -406,7 +522,7 @@ export async function agregarEjercicioAEntreno(entrenoId, ejercicio) {
         if (ejercicio.bibliotecaId && ejercicio.categoriaId) {
             try {
                 const docRef = doc(db, 'categoriasMusculares', ejercicio.categoriaId, 'ejercicios', ejercicio.bibliotecaId);
-                const docSnap = await getDoc(docRef);
+                const docSnap = await getDocCacheFirst(docRef);
                 if (docSnap.exists() && docSnap.data().registros) {
                     registrosIniciales = docSnap.data().registros;
                 }
@@ -453,7 +569,7 @@ export async function toggleCompletadoEjercicio(entrenoId, ejercicioId, estado, 
         
         // 2. Buscar el documento del ejercicio en Firestore
         const ejerciciosCollection = collection(db, `entrenos/${firestoreId}/ejercicios`);
-        const snapshot = await getDocs(ejerciciosCollection);
+        const snapshot = await getDocsCacheFirst(ejerciciosCollection);
         
         let docId = null;
         snapshot.forEach(docSnapshot => {
@@ -484,7 +600,7 @@ export async function toggleCompletadoEjercicio(entrenoId, ejercicioId, estado, 
         // Solo si tenemos el nombre y el total (si no, es un toggle rápido que no afecta historial global)
         if (entrenoNombre && totalEjercicios) {
             const historialRef = doc(db, 'historialDias', fechaString);
-            const historialSnap = await getDoc(historialRef);
+            const historialSnap = await getDocCacheFirst(historialRef);
             
             let cantidadActual = 0;
             
@@ -528,7 +644,7 @@ export async function eliminarEjercicioDeEntreno(entrenoId, ejercicioId) {
         
         // Buscar el documento en Firestore
         const ejerciciosCollection = collection(db, `entrenos/${firestoreId}/ejercicios`);
-        const snapshot = await getDocs(ejerciciosCollection);
+        const snapshot = await getDocsCacheFirst(ejerciciosCollection);
         
         let docId = null;
         snapshot.forEach(docSnapshot => {
@@ -561,7 +677,7 @@ export async function actualizarEjercicioEnEntreno(entrenoId, ejercicioActualiza
         
         // Buscar el documento en Firestore
         const ejerciciosCollection = collection(db, `entrenos/${firestoreId}/ejercicios`);
-        const snapshot = await getDocs(ejerciciosCollection);
+        const snapshot = await getDocsCacheFirst(ejerciciosCollection);
         
         let docId = null;
         let ejercicioExistente = null;
@@ -663,7 +779,7 @@ export async function sustituirEjercicioEnEntreno(entrenoId, ejercicioIdOriginal
         
         // Buscar el documento en Firestore del ejercicio original
         const ejerciciosCollection = collection(db, `entrenos/${firestoreId}/ejercicios`);
-        const snapshot = await getDocs(ejerciciosCollection);
+        const snapshot = await getDocsCacheFirst(ejerciciosCollection);
         
         let docId = null;
         snapshot.forEach(docSnapshot => {
@@ -914,7 +1030,7 @@ export async function obtenerCategorias() {
     try {
         const categoriasCollection = collection(db, 'categoriasMusculares');
         const q = query(categoriasCollection, orderBy('fechaCreacion', 'asc'));
-        const snapshot = await getDocs(q);
+        const snapshot = await getDocsCacheFirst(q);
         
         if (snapshot.empty) {
             return [];
@@ -1047,7 +1163,7 @@ export async function obtenerEjerciciosDeCategoria(categoriaId) {
         const categoriaRef = doc(db, 'categoriasMusculares', categoriaId);
         const ejerciciosCollection = collection(categoriaRef, 'ejercicios');
         const q = query(ejerciciosCollection, orderBy('fechaCreacion', 'asc'));
-        const snapshot = await getDocs(q);
+        const snapshot = await getDocsCacheFirst(q);
         
         if (snapshot.empty) {
             return [];
@@ -1075,30 +1191,50 @@ export async function obtenerEjerciciosDeCategoria(categoriaId) {
 // Función para obtener todos los ejercicios de todas las categorías (para el modal de selección)
 export async function obtenerTodosLosEjerciciosDeBiblioteca() {
     try {
+        // Paso 1: Obtener todas las categorías
         const categorias = await obtenerCategorias();
-        const ejerciciosPorCategoria = [];
         
-        for (const categoria of categorias) {
-            const ejercicios = await obtenerEjerciciosDeCategoria(categoria.id);
-            if (ejercicios.length > 0) {
-                ejerciciosPorCategoria.push({
-                    categoria: {
-                        id: categoria.id,
-                        nombre: categoria.nombre
-                    },
-                    ejercicios: ejercicios.map(ej => ({
-                        ...ej,
-                        categoriaId: categoria.id,
-                        bibliotecaId: ej.id // ID original en la biblioteca
-                    }))
-                });
-            }
+        if (!categorias || categorias.length === 0) {
+            return [];
         }
         
-        return ejerciciosPorCategoria;
+        // Paso 2: Usar Promise.all para buscar ejercicios en paralelo
+        const promesas = categorias.map(async (cat) => {
+            try {
+                const ejercicios = await obtenerEjerciciosDeCategoria(cat.id);
+                
+                // Solo devolver si hay ejercicios
+                if (ejercicios && ejercicios.length > 0) {
+                    return {
+                        categoria: {
+                            id: cat.id,
+                            nombre: cat.nombre
+                        },
+                        ejercicios: ejercicios.map(ej => ({
+                            ...ej,
+                            categoriaId: cat.id,
+                            bibliotecaId: ej.id // ID original en la biblioteca
+                        }))
+                    };
+                }
+                // Si no hay ejercicios, devolver null (se filtrará después)
+                return null;
+            } catch (error) {
+                // Si una categoría falla, solo loguear el warning y continuar
+                console.warn(`⚠️ Error al cargar ejercicios de la categoría "${cat.nombre}":`, error);
+                return null; // Devuelve null, no rompe todo
+            }
+        });
+        
+        // Esperar todas las promesas (incluso las que fallaron)
+        const resultados = await Promise.all(promesas);
+        
+        // Filtrar los nulls y devolver solo las categorías con ejercicios
+        return resultados.filter(item => item !== null);
     } catch (error) {
-        console.error('Error al obtener todos los ejercicios de la biblioteca:', error);
-        throw error;
+        // Error fatal: siempre devolver array vacío, nunca lanzar error
+        console.error('❌ Error fatal cargando biblioteca:', error);
+        return [];
     }
 }
 
@@ -1208,7 +1344,7 @@ export async function guardarPerfil(datos) {
 export async function obtenerPerfil() {
     try {
         const perfilRef = doc(db, 'usuarios', 'mi_perfil');
-        const perfilSnap = await getDoc(perfilRef);
+        const perfilSnap = await getDocCacheFirst(perfilRef);
         
         if (perfilSnap.exists()) {
             return perfilSnap.data();
@@ -1283,7 +1419,7 @@ export async function obtenerHistorialCorporal() {
     try {
         const historialCollection = collection(db, 'historialCorporal');
         const q = query(historialCollection, orderBy('timestamp', 'asc'));
-        const snapshot = await getDocs(q);
+        const snapshot = await getDocsCacheFirst(q);
         
         const historial = [];
         snapshot.forEach(doc => {
@@ -1351,7 +1487,7 @@ export async function eliminarMedicion(id) {
 export async function borrarTodoHistorialCorporal() {
     try {
         const historialCollection = collection(db, 'historialCorporal');
-        const snapshot = await getDocs(historialCollection);
+        const snapshot = await getDocsCacheFirst(historialCollection);
         
         const deletePromises = [];
         snapshot.forEach(doc => {
@@ -1431,7 +1567,7 @@ export async function obtenerEjerciciosBiblioteca() {
     try {
         const bibliotecaCollection = collection(db, 'bibliotecaEjercicios');
         const q = query(bibliotecaCollection, orderBy('fechaCreacion', 'desc'));
-        const snapshot = await getDocs(q);
+        const snapshot = await getDocsCacheFirst(q);
         
         if (snapshot.empty) {
             return [];
@@ -1461,7 +1597,7 @@ export async function editarEjercicioBiblioteca(id, data) {
         const ejercicioRef = doc(db, 'bibliotecaEjercicios', id);
         
         // Obtener el ejercicio actual para verificar si hay imagen existente
-        const ejercicioDoc = await getDoc(ejercicioRef);
+        const ejercicioDoc = await getDocCacheFirst(ejercicioRef);
         if (!ejercicioDoc.exists()) {
             throw new Error('Ejercicio no encontrado');
         }
@@ -1500,7 +1636,7 @@ export async function eliminarEjercicioBiblioteca(id) {
         const ejercicioRef = doc(db, 'bibliotecaEjercicios', id);
         
         // Paso 1: Obtener el ejercicio para eliminar su imagen si existe
-        const ejercicioDoc = await getDoc(ejercicioRef);
+        const ejercicioDoc = await getDocCacheFirst(ejercicioRef);
         let imagenUrl = null;
         if (ejercicioDoc.exists()) {
             const ejercicio = ejercicioDoc.data();
@@ -1514,14 +1650,14 @@ export async function eliminarEjercicioBiblioteca(id) {
         
         // Paso 2: Buscar y eliminar referencias en todos los entrenos
         // 1. Obtener todos los entrenos
-        const entrenosSnap = await getDocs(collection(db, 'entrenos'));
+        const entrenosSnap = await getDocsCacheFirst(collection(db, 'entrenos'));
         
         // 2. Recorrer cada entreno
         for (const entrenoDoc of entrenosSnap.docs) {
             // 3. Buscar en la subcolección 'ejercicios' de este entreno
             const ejerciciosRef = collection(db, 'entrenos', entrenoDoc.id, 'ejercicios');
             const q = query(ejerciciosRef, where('bibliotecaId', '==', id));
-            const querySnapshot = await getDocs(q);
+            const querySnapshot = await getDocsCacheFirst(q);
             
             // 4. Borrar cada coincidencia encontrada
             const deletePromises = querySnapshot.docs.map(doc => deleteDoc(doc.ref));
@@ -1544,7 +1680,7 @@ export async function obtenerDiasEntrenados() {
         const historialCollection = collection(db, 'historialDias');
         // NO usar orderBy('timestamp') porque los documentos antiguos pueden no tener ese campo
         // Simplemente obtener todos los documentos y ordenar por el ID (que es la fecha)
-        const snapshot = await getDocs(historialCollection);
+        const snapshot = await getDocsCacheFirst(historialCollection);
         
         const dias = [];
         snapshot.forEach(doc => {

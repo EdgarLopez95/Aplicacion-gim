@@ -396,7 +396,7 @@
 
 .lista-registros {
     width: 100%;
-    padding-bottom:30px; /* Espacio para el menú inferior y botones flotantes */
+    /*padding-bottom:30px;  Espacio para el menú inferior y botones flotantes */
 }
 
 .registros-table-container {

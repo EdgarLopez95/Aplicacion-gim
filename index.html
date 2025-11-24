@@ -116,6 +116,24 @@
     </nav>
 
     <script type="module" src="js/main.js"></script>
+    
+    <!-- Silenciar errores de WebSocket del servidor de desarrollo (Live Server) -->
+    <script>
+        // Solo en desarrollo local, silenciar errores de WebSocket de Live Server
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+            const originalError = console.error;
+            console.error = function(...args) {
+                // Filtrar errores de WebSocket de Live Server
+                const message = args[0]?.toString() || '';
+                if (message.includes('WebSocket') && message.includes('5500')) {
+                    // Silenciar este error específico
+                    return;
+                }
+                // Mostrar otros errores normalmente
+                originalError.apply(console, args);
+            };
+        }
+    </script>
 </body>
 </html>
 
