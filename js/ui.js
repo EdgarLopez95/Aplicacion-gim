@@ -1,5 +1,7 @@
 // ui.js - Lógica de manipulación del DOM
 
+import { obtenerUltimoRegistro } from './storage.js';
+
 // Función auxiliar para formatear fecha visual sin problemas de timezone
 function formatearFechaVisual(fechaString) {
     if (!fechaString) return '--';
@@ -713,17 +715,19 @@ export function renderizarListaCategorias(categorias, onEditarClick, onEliminarC
         return;
     }
     
-    // Renderizar las tarjetas de categorías
+    // Renderizar las tarjetas de categorías en grid de 2 columnas
     categorias.map((categoria, index) => {
         const card = document.createElement('div');
         card.className = 'categoria-card';
         card.dataset.categoriaId = categoria.id;
         
         card.innerHTML = `
-            <div class="categoria-numero">
-                <span>${index + 1}</span>
+            <div class="categoria-card-content">
+                <div class="categoria-numero-badge">
+                    <span>${index + 1}</span>
+                </div>
+                <span class="categoria-nombre">${categoria.nombre}</span>
             </div>
-            <span class="categoria-nombre">${categoria.nombre}</span>
             <div class="categoria-botones">
                 <button class="btn-editar" data-categoria-id="${categoria.id}" title="Editar">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -999,6 +1003,15 @@ export function renderizarEjercicioView(ejercicio, registros, onEditarRegistroCl
         <div id="modal-nuevo-registro" class="modal">
             <div class="modal-content">
                 <h3>Nuevo Registro</h3>
+                <div id="ultimo-registro-info" class="last-record-info" style="display: none;">
+                    <div class="last-record-header">
+                        <span class="label">ANTERIOR:</span>
+                        <span id="ultimo-registro-fecha" class="last-record-date">--</span>
+                    </div>
+                    <div id="ultimo-registro-series" class="last-record-series-grid">
+                        <!-- Se llenará dinámicamente -->
+                    </div>
+                </div>
                 <form id="form-nuevo-registro" class="form-registro">
                     <div class="form-group">
                         <label for="fecha-registro">Fecha</label>
@@ -1006,17 +1019,17 @@ export function renderizarEjercicioView(ejercicio, registros, onEditarRegistroCl
                     </div>
                     
                     <div class="form-group">
-                        <label>Series</label>
-                        <div class="series-container">
+                        <div class="registro-grid">
+                            <!-- Encabezados -->
+                            <span class="registro-header"></span>
+                            <span class="registro-header">KGS</span>
+                            <span class="registro-header">REPS</span>
+                            
+                            <!-- Filas de inputs -->
                             ${[1, 2, 3, 4].map(num => `
-                                <div class="serie-input">
-                                    <label>Serie ${num}</label>
-                                    <div class="serie-inputs">
-                                        <input type="number" id="peso-serie-${num}" name="peso-${num}" placeholder="Peso (kg)" min="0" step="any">
-                                        <span>x</span>
-                                        <input type="number" id="rep-serie-${num}" name="rep-${num}" placeholder="Reps" min="0" step="any">
-                                    </div>
-                                </div>
+                                <span class="registro-index">${num}</span>
+                                <input type="number" id="peso-serie-${num}" name="peso-${num}" placeholder="0" min="0" step="any">
+                                <input type="number" id="rep-serie-${num}" name="rep-${num}" placeholder="0" min="0" step="any">
                             `).join('')}
                         </div>
                     </div>
@@ -1028,7 +1041,7 @@ export function renderizarEjercicioView(ejercicio, registros, onEditarRegistroCl
                     
                     <div class="modal-buttons">
                         <button type="button" id="btn-cancelar-registro" class="btn btn-secondary">Cancelar</button>
-                        <button type="submit" class="btn">Guardar Registro</button>
+                        <button type="submit" class="btn">Guardar</button>
                     </div>
                 </form>
             </div>
@@ -1085,52 +1098,57 @@ export function renderizarListaRegistros(registros, onEditarRegistroClick, onEli
     };
     
     const registrosHTML = registros && registros.length > 0
-        ? `
-            <div class="registros-table-container">
-                <table class="registros-table">
-                    <thead>
-                        <tr>
-                            <th>Fecha</th>
-                            <th>Serie 1</th>
-                            <th>Serie 2</th>
-                            <th>Serie 3</th>
-                            <th>Serie 4</th>
-                            <th>Notas</th>
-                            <th>Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${registros.map(registro => {
-                            const series = registro.series || [];
-                            return `
-                                <tr>
-                                    <td>${formatearFechaVisual(registro.fecha)}</td>
-                                    <td class="serie-cell">${formatearSerie(series[0])}</td>
-                                    <td class="serie-cell">${formatearSerie(series[1])}</td>
-                                    <td class="serie-cell">${formatearSerie(series[2])}</td>
-                                    <td class="serie-cell">${formatearSerie(series[3])}</td>
-                                    <td class="notas-cell">${registro.notas || '-'}</td>
-                                    <td class="acciones-cell">
-                                        <button class="btn-editar-registro" data-registro-id="${registro.id}" title="Editar">
-                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                                            </svg>
-                                        </button>
-                                        <button class="btn-eliminar-registro" data-registro-id="${registro.id}" title="Eliminar">
-                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                                <polyline points="3 6 5 6 21 6"></polyline>
-                                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                                            </svg>
-                                        </button>
-                                    </td>
-                                </tr>
-                            `;
-                        }).join('')}
-                    </tbody>
-                </table>
-            </div>
-        `
+        ? registros.map(registro => {
+            const series = registro.series || [];
+            const fechaFormateada = formatearFechaVisual(registro.fecha);
+            
+            // Generar items de series (máximo 4)
+            const seriesItems = [];
+            for (let i = 0; i < 4; i++) {
+                const serie = series[i];
+                if (serie && serie.peso && serie.repeticiones) {
+                    seriesItems.push(`
+                        <div class="serie-item">
+                            <span class="serie-label">S${i + 1}</span>
+                            <span class="serie-value">${serie.peso}kg x ${serie.repeticiones}</span>
+                        </div>
+                    `);
+                } else {
+                    seriesItems.push(`
+                        <div class="serie-item">
+                            <span class="serie-label">S${i + 1}</span>
+                            <span class="serie-value">-</span>
+                        </div>
+                    `);
+                }
+            }
+            
+            return `
+                <div class="historial-card">
+                    <div class="historial-header">
+                        <span class="historial-date">${fechaFormateada}</span>
+                        <div class="historial-actions">
+                            <button class="btn-editar-registro" data-registro-id="${registro.id}" title="Editar">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                </svg>
+                            </button>
+                            <button class="btn-eliminar-registro" data-registro-id="${registro.id}" title="Eliminar">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="3 6 5 6 21 6"></polyline>
+                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="historial-series-grid">
+                        ${seriesItems.join('')}
+                    </div>
+                    ${registro.notas ? `<div class="historial-notes">Notas: ${registro.notas}</div>` : ''}
+                </div>
+            `;
+        }).join('')
         : '<p style="color: var(--text-secondary); text-align: center; padding: 20px;">No hay registros aún</p>';
     
     listaRegistros.innerHTML = registrosHTML;
@@ -1202,7 +1220,8 @@ export function ocultarModal() {
 }
 
 // Función para mostrar el modal de registro
-export function mostrarModalRegistro() {
+// Parámetros opcionales: entrenoId y ejercicioId para obtener y mostrar el último registro
+export async function mostrarModalRegistro(entrenoId = null, ejercicioId = null) {
     const modalRegistro = document.getElementById('modal-nuevo-registro');
     if (modalRegistro) {
         modalRegistro.classList.add('active');
@@ -1220,6 +1239,95 @@ export function mostrarModalRegistro() {
             return `${year}-${month}-${day}`;
         };
         fechaInput.value = obtenerFechaLocal();
+    }
+    
+    // Obtener y mostrar el último registro si tenemos los IDs
+    const ultimoRegistroInfo = document.getElementById('ultimo-registro-info');
+    const form = document.getElementById('form-nuevo-registro');
+    
+    if (entrenoId && ejercicioId && ultimoRegistroInfo && form) {
+        try {
+            const ultimoRegistro = await obtenerUltimoRegistro(entrenoId, ejercicioId);
+            
+            if (ultimoRegistro) {
+                // Mostrar el contenedor de referencia
+                ultimoRegistroInfo.style.display = 'flex';
+                
+                // Formatear fecha
+                const fechaFormateada = formatearFechaCorta(ultimoRegistro.fecha);
+                const series = ultimoRegistro.series || [];
+                
+                // Actualizar fecha
+                const ultimoRegistroFecha = document.getElementById('ultimo-registro-fecha');
+                if (ultimoRegistroFecha) {
+                    ultimoRegistroFecha.textContent = fechaFormateada;
+                }
+                
+                // Generar grid de series
+                const ultimoRegistroSeries = document.getElementById('ultimo-registro-series');
+                if (ultimoRegistroSeries) {
+                    const seriesHTML = [];
+                    for (let i = 0; i < 4; i++) {
+                        const serie = series[i];
+                        if (serie && serie.peso && serie.repeticiones) {
+                            seriesHTML.push(`
+                                <div class="last-record-serie-item">
+                                    <span class="last-record-serie-label">S${i + 1}</span>
+                                    <span class="last-record-serie-value">${serie.peso}kg × ${serie.repeticiones}</span>
+                                </div>
+                            `);
+                        } else {
+                            seriesHTML.push(`
+                                <div class="last-record-serie-item last-record-serie-empty">
+                                    <span class="last-record-serie-label">S${i + 1}</span>
+                                    <span class="last-record-serie-value">-</span>
+                                </div>
+                            `);
+                        }
+                    }
+                    ultimoRegistroSeries.innerHTML = seriesHTML.join('');
+                }
+                
+                // Pre-llenar los inputs con los valores del último registro
+                for (let i = 1; i <= 4; i++) {
+                    const serie = series[i - 1];
+                    const pesoInput = form.querySelector(`#peso-serie-${i}`);
+                    const repInput = form.querySelector(`#rep-serie-${i}`);
+                    
+                    if (pesoInput && repInput) {
+                        if (serie && serie.peso && serie.repeticiones) {
+                            pesoInput.value = serie.peso;
+                            repInput.value = serie.repeticiones;
+                        } else {
+                            pesoInput.value = '';
+                            repInput.value = '';
+                        }
+                    }
+                }
+            } else {
+                // No hay registro anterior, ocultar el contenedor
+                ultimoRegistroInfo.style.display = 'none';
+                
+                // Limpiar los inputs
+                for (let i = 1; i <= 4; i++) {
+                    const pesoInput = form.querySelector(`#peso-serie-${i}`);
+                    const repInput = form.querySelector(`#rep-serie-${i}`);
+                    if (pesoInput) pesoInput.value = '';
+                    if (repInput) repInput.value = '';
+                }
+            }
+        } catch (error) {
+            console.error('Error al obtener último registro:', error);
+            // En caso de error, ocultar el contenedor
+            if (ultimoRegistroInfo) {
+                ultimoRegistroInfo.style.display = 'none';
+            }
+        }
+    } else {
+        // Si no tenemos los IDs, ocultar el contenedor
+        if (ultimoRegistroInfo) {
+            ultimoRegistroInfo.style.display = 'none';
+        }
     }
     
     // Ocultar botones flotantes cuando se muestra el modal
@@ -1257,10 +1365,10 @@ export function ocultarModalRegistro() {
             fechaInput.value = obtenerFechaLocal();
         }
         
-        // Restaurar el texto del botón a "Guardar Registro"
+        // Restaurar el texto del botón a "Guardar"
         const btnSubmit = formRegistro.querySelector('button[type="submit"]');
         if (btnSubmit) {
-            btnSubmit.textContent = 'Guardar Registro';
+            btnSubmit.textContent = 'Guardar';
         }
     }
 }
@@ -1833,7 +1941,7 @@ export function renderizarModalSeleccionEjercicio(ejerciciosPorCategoria) {
 }
 
 // Función para renderizar la vista de calendario
-export function renderizarCalendarioView(diasEntrenados = [], racha = 0) {
+export function renderizarCalendarioView(diasEntrenados = [], racha = 0, fechaReferencia = null) {
     const calendarioView = document.getElementById('calendario-view');
     if (!calendarioView) {
         console.error('calendario-view no encontrado');
@@ -1847,10 +1955,15 @@ export function renderizarCalendarioView(diasEntrenados = [], racha = 0) {
         diasMap.set(fecha, typeof dia === 'string' ? null : dia);
     });
     
-    // Obtener fecha actual
+    // Usar fechaReferencia o fecha actual por defecto
+    const fechaBase = fechaReferencia || new Date();
+    const añoActual = fechaBase.getFullYear();
+    const mesActual = fechaBase.getMonth(); // 0-11
+    
+    // Obtener fecha actual real para comparaciones
     const hoy = new Date();
-    const añoActual = hoy.getFullYear();
-    const mesActual = hoy.getMonth(); // 0-11
+    const añoHoy = hoy.getFullYear();
+    const mesHoy = hoy.getMonth();
     const diaHoy = hoy.getDate();
     
     // Obtener primer día del mes y último día
@@ -1865,8 +1978,8 @@ export function renderizarCalendarioView(diasEntrenados = [], racha = 0) {
     const nombresDias = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
     
     // Calcular estadísticas del mes
-    let diasEntrenadosMes = 0;
-    let diasCumplidosMes = 0;
+    let diasPerfectos = 0; // Días verdes (cantidad === total)
+    let diasParciales = 0; // Días amarillos/naranjas (cantidad > 0 pero cantidad < total)
     const entrenosPorNombre = new Map();
     
     // Generar grid de días
@@ -1882,8 +1995,8 @@ export function renderizarCalendarioView(diasEntrenados = [], racha = 0) {
         gridHTML += '<div class="calendar-day empty"></div>';
     }
     
-    // Calcular fecha de hoy para comparar
-    const fechaHoyString = `${añoActual}-${String(mesActual + 1).padStart(2, '0')}-${String(diaHoy).padStart(2, '0')}`;
+    // Calcular fecha de hoy real para comparar (no la fecha de referencia)
+    const fechaHoyString = `${añoHoy}-${String(mesHoy + 1).padStart(2, '0')}-${String(diaHoy).padStart(2, '0')}`;
     let diasFalladosMes = 0;
     
     // Días del mes
@@ -1892,7 +2005,7 @@ export function renderizarCalendarioView(diasEntrenados = [], racha = 0) {
         const fechaDia = new Date(fechaString + 'T12:00:00');
         const fechaHoy = new Date(fechaHoyString + 'T12:00:00');
         const esFuturo = fechaDia > fechaHoy;
-        const esHoy = dia === diaHoy;
+        const esHoy = (dia === diaHoy && mesActual === mesHoy && añoActual === añoHoy);
         const esPasado = fechaDia < fechaHoy;
         const datosDia = diasMap.get(fechaString);
         
@@ -1921,15 +2034,13 @@ export function renderizarCalendarioView(diasEntrenados = [], racha = 0) {
             // Aplicar clases según las reglas de estado
             if (cantidadCompletada > 0 && cantidadCompletada < 3) {
                 clases += ' day-orange'; // Naranja (Incompleto)
-                diasEntrenadosMes++;
+                diasParciales++;
             } else if (cantidadCompletada >= 3 && cantidadCompletada < totalEjercicios) {
                 clases += ' day-yellow'; // Amarillo (Cumplido)
-                diasEntrenadosMes++;
-                diasCumplidosMes++;
+                diasParciales++;
             } else if (cantidadCompletada === totalEjercicios && totalEjercicios > 0) {
                 clases += ' day-green'; // Verde (Perfecto)
-                diasEntrenadosMes++;
-                diasCumplidosMes++;
+                diasPerfectos++;
             }
             
             // Contar entrenos por nombre
@@ -1952,6 +2063,9 @@ export function renderizarCalendarioView(diasEntrenados = [], racha = 0) {
     
     gridHTML += '</div>';
     
+    // Calcular total de asistencias
+    const totalAsistencias = diasPerfectos + diasParciales;
+    
     // Generar HTML de estadísticas mensuales
     let estadisticasHTML = '<div class="calendario-estadisticas">';
     estadisticasHTML += '<h3 class="estadisticas-title">Resumen del Mes</h3>';
@@ -1959,46 +2073,61 @@ export function renderizarCalendarioView(diasEntrenados = [], racha = 0) {
     
     estadisticasHTML += `
         <div class="stat-card-mes">
-            <div class="stat-label-mes">Días Entrenados</div>
-            <div class="stat-value-mes">${diasEntrenadosMes}</div>
+            <div class="stat-label-mes">Entrenamientos Totales</div>
+            <div class="stat-value-mes">${totalAsistencias}</div>
         </div>
         <div class="stat-card-mes">
-            <div class="stat-label-mes">Días Cumplidos</div>
-            <div class="stat-value-mes">${diasCumplidosMes}</div>
+            <div class="stat-label-mes">Días Perfectos</div>
+            <div class="stat-value-mes">${diasPerfectos}</div>
+        </div>
+        <div class="stat-card-mes stat-card-parciales">
+            <div class="stat-label-mes">Días Parciales</div>
+            <div class="stat-value-mes">${diasParciales}</div>
         </div>
         <div class="stat-card-mes stat-card-fallados">
-            <div class="stat-label-mes">Días Fallados</div>
+            <div class="stat-label-mes">Días de Descanso</div>
             <div class="stat-value-mes">${diasFalladosMes}</div>
         </div>
     `;
     
     estadisticasHTML += '</div>';
     
-    // Desglose por entreno (Frecuencia)
-    if (entrenosPorNombre.size > 0) {
-        estadisticasHTML += '<div class="entrenos-desglose">';
-        estadisticasHTML += '<h4 class="desglose-title">Frecuencia por Entreno</h4>';
-        estadisticasHTML += '<div class="desglose-list">';
+    // Desglose por entreno (Frecuencia) - Grid de tarjetas estilo ANTERIOR
+    estadisticasHTML += '<div class="entrenos-desglose">';
+    estadisticasHTML += '<h4 class="desglose-title">Frecuencia por Entreno</h4>';
+    estadisticasHTML += '<div class="frecuencia-grid">';
+    
+    // Definir los 4 entrenos principales en orden
+    const entrenosPrincipales = ['Push', 'Pull', 'Piernas', 'Gluteos'];
+    
+    entrenosPrincipales.forEach(nombre => {
+        const cantidad = entrenosPorNombre.get(nombre) || 0;
+        const tieneDatos = cantidad > 0;
         
-        Array.from(entrenosPorNombre.entries())
-            .sort((a, b) => b[1] - a[1]) // Ordenar por cantidad descendente
-            .forEach(([nombre, cantidad]) => {
-                estadisticasHTML += `
-                    <div class="desglose-item">
-                        <span class="desglose-nombre">Has entrenado ${nombre}</span>
-                        <span class="desglose-cantidad">${cantidad} vez${cantidad !== 1 ? 'es' : ''}</span>
-                    </div>
-                `;
-            });
-        
-        estadisticasHTML += '</div>';
-        estadisticasHTML += '</div>';
-    }
+        estadisticasHTML += `
+            <div class="frecuencia-card ${!tieneDatos ? 'frecuencia-card-empty' : ''}">
+                <div class="frecuencia-card-label">${nombre}</div>
+                <div class="frecuencia-card-value">${cantidad}</div>
+            </div>
+        `;
+    });
+    
+    estadisticasHTML += '</div>';
+    estadisticasHTML += '</div>';
     
     estadisticasHTML += '</div>';
     
-    // Toast para mostrar información del día
-    const toastHTML = '<div id="calendar-toast" class="calendar-toast" style="display: none;"></div>';
+    // Modal para mostrar detalle del día
+    const modalHTML = `
+        <div id="modal-detalle-dia" class="modal-detalle-dia">
+            <div class="modal-detalle-dia-content">
+                <button class="modal-detalle-dia-close" id="btn-cerrar-detalle-dia">&times;</button>
+                <div id="detalle-dia-contenido">
+                    <!-- Se llenará dinámicamente -->
+                </div>
+            </div>
+        </div>
+    `;
     
     const calendarioHTML = `
         <div class="calendario-container">
@@ -2014,14 +2143,16 @@ export function renderizarCalendarioView(diasEntrenados = [], racha = 0) {
             </div>
             
             <div class="calendario-mes-header">
+                <button id="btn-prev-month" class="btn-icon-small" aria-label="Mes anterior">❮</button>
                 <h3>${nombresMeses[mesActual]} ${añoActual}</h3>
+                <button id="btn-next-month" class="btn-icon-small" aria-label="Mes siguiente">❯</button>
             </div>
             
             ${gridHTML}
             
             ${estadisticasHTML}
             
-            ${toastHTML}
+            ${modalHTML}
         </div>
     `;
     
@@ -2029,8 +2160,85 @@ export function renderizarCalendarioView(diasEntrenados = [], racha = 0) {
     
     // Configurar event listeners para los días
     const calendarDays = calendarioView.querySelectorAll('.calendar-day[data-fecha]');
-    const toast = calendarioView.querySelector('#calendar-toast');
+    const modalDetalle = calendarioView.querySelector('#modal-detalle-dia');
+    const contenidoDetalle = calendarioView.querySelector('#detalle-dia-contenido');
+    const btnCerrarDetalle = calendarioView.querySelector('#btn-cerrar-detalle-dia');
     
+    // Función para abrir el modal
+    function abrirModalDetalle(fecha, cantidad, total, entreno, esRojo) {
+        if (!modalDetalle || !contenidoDetalle) return;
+        
+        const fechaFormateada = formatearFechaCorta(fecha);
+        let contenidoHTML = '';
+        
+        if (esRojo) {
+            // Día rojo: Día de descanso
+            contenidoHTML = `
+                <div class="detalle-dia-header">
+                    <h2 class="detalle-dia-fecha">${fechaFormateada}</h2>
+                </div>
+                <div class="detalle-dia-body">
+                    <div class="detalle-dia-mensaje">
+                        <div class="detalle-dia-icono">😴</div>
+                        <p class="detalle-dia-texto">Día de Descanso</p>
+                    </div>
+                </div>
+            `;
+        } else if (cantidad && total && entreno) {
+            // Día con datos: mostrar información completa
+            let estado = '';
+            let estadoColor = '';
+            let estadoTexto = '';
+            
+            if (cantidad > 0 && cantidad < 3) {
+                estado = 'incompleto';
+                estadoColor = '#ff8800';
+                estadoTexto = 'Incompleto';
+            } else if (cantidad >= 3 && cantidad < total) {
+                estado = 'parcial';
+                estadoColor = '#ffcc00';
+                estadoTexto = 'Parcial';
+            } else if (cantidad === total && total > 0) {
+                estado = 'completado';
+                estadoColor = '#dfff00';
+                estadoTexto = 'Completado';
+            }
+            
+            contenidoHTML = `
+                <div class="detalle-dia-header">
+                    <h2 class="detalle-dia-fecha">${fechaFormateada}</h2>
+                </div>
+                <div class="detalle-dia-body">
+                    <div class="detalle-dia-entreno">
+                        <span class="detalle-dia-label">Entreno:</span>
+                        <span class="detalle-dia-valor">${entreno}</span>
+                    </div>
+                    <div class="detalle-dia-estado" style="border-color: ${estadoColor}; background-color: ${estadoColor}20;">
+                        <span class="detalle-dia-estado-badge" style="color: ${estadoColor};">${estadoTexto}</span>
+                    </div>
+                    <div class="detalle-dia-detalle">
+                        <span class="detalle-dia-label">Detalle:</span>
+                        <span class="detalle-dia-valor">${cantidad} de ${total} ejercicios completados</span>
+                    </div>
+                </div>
+            `;
+        } else {
+            // Día futuro sin datos
+            return;
+        }
+        
+        contenidoDetalle.innerHTML = contenidoHTML;
+        modalDetalle.style.display = 'flex';
+    }
+    
+    // Función para cerrar el modal
+    function cerrarModalDetalle() {
+        if (modalDetalle) {
+            modalDetalle.style.display = 'none';
+        }
+    }
+    
+    // Event listeners
     calendarDays.forEach(day => {
         day.addEventListener('click', function() {
             const fecha = this.dataset.fecha;
@@ -2039,30 +2247,23 @@ export function renderizarCalendarioView(diasEntrenados = [], racha = 0) {
             const entreno = this.dataset.entreno;
             const esRojo = this.dataset.rojo === 'true';
             
-            // Formatear fecha para mostrar (sin usar Date para evitar problemas de timezone)
-            const fechaFormateada = formatearFechaCorta(fecha);
-            
-            if (toast) {
-                if (esRojo) {
-                    // Día rojo: mostrar "Día de descanso"
-                    toast.textContent = `${fechaFormateada}: Día de descanso`;
-                } else if (cantidad && total && entreno) {
-                    // Día con datos: mostrar información del entreno
-                    toast.textContent = `${fechaFormateada}: ${entreno} - ${cantidad}/${total} Ejercicios`;
-                } else {
-                    // Día futuro sin datos
-                    return;
-                }
-                
-                toast.style.display = 'block';
-                
-                // Ocultar después de 3 segundos
-                setTimeout(() => {
-                    toast.style.display = 'none';
-                }, 3000);
-            }
+            abrirModalDetalle(fecha, cantidad, total, entreno, esRojo);
         });
     });
+    
+    // Cerrar modal al hacer clic en el botón de cerrar
+    if (btnCerrarDetalle) {
+        btnCerrarDetalle.addEventListener('click', cerrarModalDetalle);
+    }
+    
+    // Cerrar modal al hacer clic fuera del contenido
+    if (modalDetalle) {
+        modalDetalle.addEventListener('click', function(e) {
+            if (e.target === modalDetalle) {
+                cerrarModalDetalle();
+            }
+        });
+    }
 }
 
 // Función para obtener la vista de calendario

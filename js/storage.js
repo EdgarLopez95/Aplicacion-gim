@@ -821,6 +821,28 @@ export async function obtenerEjercicio(entrenoId, ejercicioId) {
     }
 }
 
+// Función para obtener el último registro de un ejercicio
+// Devuelve el registro más reciente (el primero del array, ya que usamos unshift)
+export async function obtenerUltimoRegistro(entrenoId, ejercicioId) {
+    try {
+        const ejercicio = await obtenerEjercicio(entrenoId, ejercicioId);
+        if (!ejercicio) {
+            return null;
+        }
+        
+        const registros = ejercicio.registros || [];
+        if (registros.length === 0) {
+            return null;
+        }
+        
+        // El primer registro es el más reciente (se agrega con unshift)
+        return registros[0];
+    } catch (error) {
+        console.error('Error al obtener último registro:', error);
+        return null;
+    }
+}
+
 // Función para agregar registro a un ejercicio
 export async function agregarRegistroAEjercicio(entrenoId, ejercicioId, nuevoRegistro) {
     try {

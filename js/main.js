@@ -77,6 +77,9 @@ import {
 // Referencia al botón cancelar (está en el HTML del modal)
 let btnCancelarEjercicio = null;
 
+// Variable global para la fecha del calendario
+let fechaCalendario = new Date();
+
 // Variables de estado
 let entrenoActual = null;
 let ejercicioActual = null;
@@ -585,20 +588,54 @@ async function mostrarVistaPerfil() {
 // Función para mostrar la vista de calendario
 async function mostrarVistaCalendario() {
     try {
+        // Si es la primera vez que se abre, resetear a la fecha actual
+        if (!fechaCalendario || fechaCalendario.toString() === 'Invalid Date') {
+            fechaCalendario = new Date();
+        }
+        
         // 1. Obtener días entrenados
         const diasEntrenados = await obtenerDiasEntrenados();
         
         // 2. Calcular racha semanal
         const racha = calcularRachaSemanal(diasEntrenados);
         
-        // 3. Renderizar la vista
-        renderizarCalendarioView(diasEntrenados, racha);
+        // 3. Renderizar la vista con la fecha de referencia
+        renderizarCalendarioView(diasEntrenados, racha, fechaCalendario);
         
-        // 4. Mostrar la vista
+        // 4. Configurar listeners de navegación
+        configurarNavegacionCalendario(diasEntrenados, racha);
+        
+        // 5. Mostrar la vista
         showView(getCalendarioView());
     } catch (error) {
         console.error('Error al cargar vista de calendario:', error);
         alert('Error al cargar el calendario. Por favor, intenta de nuevo.');
+    }
+}
+
+// Función para configurar la navegación del calendario
+async function configurarNavegacionCalendario(diasEntrenados, racha) {
+    const btnPrevMonth = document.getElementById('btn-prev-month');
+    const btnNextMonth = document.getElementById('btn-next-month');
+    
+    if (btnPrevMonth) {
+        btnPrevMonth.addEventListener('click', async () => {
+            fechaCalendario.setMonth(fechaCalendario.getMonth() - 1);
+            // Crear nueva instancia para evitar problemas de referencia
+            fechaCalendario = new Date(fechaCalendario);
+            renderizarCalendarioView(diasEntrenados, racha, fechaCalendario);
+            configurarNavegacionCalendario(diasEntrenados, racha);
+        });
+    }
+    
+    if (btnNextMonth) {
+        btnNextMonth.addEventListener('click', async () => {
+            fechaCalendario.setMonth(fechaCalendario.getMonth() + 1);
+            // Crear nueva instancia para evitar problemas de referencia
+            fechaCalendario = new Date(fechaCalendario);
+            renderizarCalendarioView(diasEntrenados, racha, fechaCalendario);
+            configurarNavegacionCalendario(diasEntrenados, racha);
+        });
     }
 }
 
@@ -1920,13 +1957,18 @@ function configurarEventListenersEjercicioView() {
     
     // Botón para abrir modal de registro
     if (btnAbrirModalRegistro) {
-        btnAbrirModalRegistro.addEventListener('click', function() {
+        btnAbrirModalRegistro.addEventListener('click', async function() {
             // Resetear el estado de edición
             currentlyEditingRegistroId = null;
             // Resetear el formulario y abrir el modal
             ocultarModalRegistro(); // Primero resetear
-            setTimeout(() => {
-                mostrarModalRegistro();
+            setTimeout(async () => {
+                // Pasar los IDs del entreno y ejercicio actual para obtener el último registro
+                if (entrenoActual && ejercicioActual) {
+                    await mostrarModalRegistro(entrenoActual.id, ejercicioActual.id);
+                } else {
+                    await mostrarModalRegistro();
+                }
             }, 10);
         });
     }
@@ -2017,9 +2059,9 @@ async function manejarSubmitRegistro(e) {
         // Resetear el ID de edición
         currentlyEditingRegistroId = null;
         
-        // Cambiar el texto del botón de vuelta a "Guardar Registro"
+        // Cambiar el texto del botón de vuelta a "Guardar"
         if (boton) {
-            boton.textContent = 'Guardar Registro';
+            boton.textContent = 'Guardar';
         }
         
         // Cerrar el modal después de guardar
@@ -2147,10 +2189,10 @@ async function eliminarRegistro(registroId, botonElement) {
                 form.reset();
                 form.querySelector('#fecha-registro').value = obtenerFechaLocal();
                 
-                // Cambiar el texto del botón de vuelta a "Guardar Registro"
+                // Cambiar el texto del botón de vuelta a "Guardar"
                 const btnSubmit = form.querySelector('button[type="submit"]');
                 if (btnSubmit) {
-                    btnSubmit.textContent = 'Guardar Registro';
+                    btnSubmit.textContent = 'Guardar';
                 }
             }
         }

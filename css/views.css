@@ -205,7 +205,7 @@
     
 }
 #biblioteca-view .lista-ejercicios {
-    margin: 20px 0 50px 0;    /* ejemplo */
+    margin: 20px 0 0 0;    /* ejemplo */
 }
 
 /* Responsive - Tablet y Desktop */
@@ -397,6 +397,95 @@
 .lista-registros {
     width: 100%;
     /*padding-bottom:30px;  Espacio para el menú inferior y botones flotantes */
+}
+
+/* Tarjetas modernas para historial de registros */
+.historial-card {
+    background-color: var(--bg-secondary);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.historial-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.historial-date {
+    color: var(--accent-color);
+    font-weight: 700;
+    font-size: 14px;
+}
+
+.historial-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.historial-actions button {
+    background-color: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    cursor: pointer;
+    padding: 6px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.historial-actions button:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-color: var(--accent-color);
+}
+
+.historial-actions button svg {
+    stroke: var(--text-primary);
+}
+
+.historial-series-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    text-align: center;
+    margin-bottom: 12px;
+}
+
+.serie-item {
+    background: rgba(0, 0, 0, 0.3);
+    padding: 6px;
+    border-radius: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.serie-label {
+    color: var(--text-secondary);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.serie-value {
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.historial-notes {
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-style: italic;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .registros-table-container {
@@ -1123,8 +1212,11 @@
 }
 
 .calendario-mes-header {
-    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     margin-bottom: 8px;
+    padding: 0 8px;
 }
 
 .calendario-mes-header h3 {
@@ -1133,6 +1225,34 @@
     font-family: var(--font-title-secondary);
     font-weight: 600;
     margin: 0;
+    flex: 1;
+    text-align: center;
+}
+
+.btn-icon-small {
+    background: transparent;
+    border: none;
+    color: var(--text-primary);
+    font-size: 24px;
+    cursor: pointer;
+    padding: 8px 12px;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+}
+
+.btn-icon-small:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: var(--accent-color);
+    transform: scale(1.1);
+}
+
+.btn-icon-small:active {
+    transform: scale(0.95);
 }
 
 .calendar-grid {
@@ -1261,6 +1381,157 @@
     }
 }
 
+/* Modal de detalle del día */
+.modal-detalle-dia {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.85);
+    z-index: 3000;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+.modal-detalle-dia-content {
+    background: linear-gradient(135deg, var(--bg-secondary) 0%, rgba(28, 28, 30, 0.95) 100%);
+    border-radius: 16px;
+    padding: 24px;
+    max-width: 400px;
+    width: 100%;
+    position: relative;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.modal-detalle-dia-close {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 32px;
+    line-height: 1;
+    cursor: pointer;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+    padding: 0;
+}
+
+.modal-detalle-dia-close:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
+    transform: rotate(90deg);
+}
+
+.detalle-dia-header {
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.detalle-dia-fecha {
+    font-size: 28px;
+    font-family: var(--font-title-main);
+    font-weight: 400;
+    color: var(--text-primary);
+    margin: 0;
+    letter-spacing: 1px;
+}
+
+.detalle-dia-body {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.detalle-dia-mensaje {
+    text-align: center;
+    padding: 24px;
+}
+
+.detalle-dia-icono {
+    font-size: 48px;
+    margin-bottom: 12px;
+}
+
+.detalle-dia-texto {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin: 0;
+}
+
+.detalle-dia-entreno,
+.detalle-dia-detalle {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background-color: rgba(0, 0, 0, 0.3);
+    border-radius: 8px;
+}
+
+.detalle-dia-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.detalle-dia-valor {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+    font-family: var(--font-title-secondary);
+}
+
+.detalle-dia-estado {
+    padding: 12px 16px;
+    border-radius: 8px;
+    border: 2px solid;
+    text-align: center;
+    margin: 8px 0;
+}
+
+.detalle-dia-estado-badge {
+    font-size: 14px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
 /* Estadísticas mensuales */
 .calendario-estadisticas {
     margin-top: 32px;
@@ -1288,8 +1559,12 @@
 
 @media (min-width: 768px) {
     .estadisticas-grid {
-        grid-template-columns: repeat(3, 1fr);
+        grid-template-columns: repeat(4, 1fr);
     }
+}
+
+.stat-card-parciales .stat-value-mes {
+    color: #ffcc00;
 }
 
 .stat-card-fallados .stat-value-mes {
@@ -1320,7 +1595,7 @@
     line-height: 1;
 }
 
-/* Desglose por entreno */
+/* Desglose por entreno - Grid de tarjetas estilo ANTERIOR */
 .entrenos-desglose {
     margin-top: 20px;
     padding-top: 20px;
@@ -1336,32 +1611,78 @@
     margin-bottom: 12px;
 }
 
-.desglose-list {
+.frecuencia-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+}
+
+.frecuencia-card {
+    background: linear-gradient(135deg, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0.3) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    padding: 12px 8px;
     display: flex;
     flex-direction: column;
-    gap: 8px;
-}
-
-.desglose-item {
-    display: flex;
-    justify-content: space-between;
     align-items: center;
-    padding: 10px 12px;
-    background-color: var(--bg-primary);
-    border-radius: 6px;
+    gap: 8px;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
 }
 
-.desglose-nombre {
-    font-size: 14px;
-    font-weight: 500;
-    color: var(--text-primary);
+.frecuencia-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--accent-color);
+    opacity: 0;
+    transition: opacity 0.3s ease;
 }
 
-.desglose-cantidad {
-    font-size: 16px;
+.frecuencia-card:hover {
+    background: linear-gradient(135deg, rgba(0, 0, 0, 0.6) 0%, rgba(0, 0, 0, 0.4) 100%);
+    border-color: rgba(223, 255, 0, 0.4);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(223, 255, 0, 0.2);
+}
+
+.frecuencia-card:hover::before {
+    opacity: 1;
+}
+
+.frecuencia-card-empty {
+    opacity: 0.4;
+    border-style: dashed;
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.frecuencia-card-label {
+    font-size: 10px;
+    color: var(--text-secondary);
     font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    opacity: 0.7;
+}
+
+.frecuencia-card-value {
+    font-size: 20px;
     color: var(--accent-color);
+    font-weight: 700;
+    text-align: center;
+    line-height: 1.2;
+    text-shadow: 0 0 8px rgba(223, 255, 0, 0.2);
     font-family: var(--font-title-secondary);
+}
+
+.frecuencia-card-empty .frecuencia-card-value {
+    color: var(--text-secondary);
+    opacity: 0.5;
+    text-shadow: none;
 }
 
 /* Responsive - Tablet y Desktop */
