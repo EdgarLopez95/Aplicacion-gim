@@ -989,13 +989,12 @@ export function renderizarEjercicioView(ejercicio, registros, onEditarRegistroCl
     // Actualizar referencias después de renderizar
     actualizarReferenciasDOM();
     
-    // Renderizar los registros usando la función que genera las tarjetas bonitas
-    // Esto asegura que todos los registros (antiguos y nuevos) se vean igual
-    renderizarListaRegistros(registros, onEditarRegistroClick, onEliminarRegistroClick);
+    // Los registros se renderizarán después usando renderizarRegistrosPaginados()
+    // No renderizamos aquí para permitir la paginación
 }
 
 // Función para renderizar solo la lista de registros (actualizar después de agregar)
-export function renderizarListaRegistros(registros, onEditarRegistroClick, onEliminarRegistroClick) {
+export function renderizarListaRegistros(registros, onEditarRegistroClick, onEliminarRegistroClick, paginaActual = 1, totalPaginas = 1) {
     actualizarReferenciasDOM();
     
     const listaRegistros = document.getElementById('lista-registros');
@@ -1011,7 +1010,7 @@ export function renderizarListaRegistros(registros, onEditarRegistroClick, onEli
         return '-';
     };
     
-    const registrosHTML = registros && registros.length > 0
+    let registrosHTML = registros && registros.length > 0
         ? registros.map(registro => {
             const series = registro.series || [];
             const fechaFormateada = formatearFechaVisual(registro.fecha);
@@ -1064,6 +1063,17 @@ export function renderizarListaRegistros(registros, onEditarRegistroClick, onEli
             `;
         }).join('')
         : '<p style="color: var(--text-secondary); text-align: center; padding: 20px;">No hay registros aún</p>';
+    
+    // Añadir controles de paginación si es necesario
+    if (totalPaginas > 1) {
+        registrosHTML += `
+            <div class="pagination-controls" style="margin-top: 20px;">
+                <button id="btn-prev-ejercicio" class="btn-icon-small" ${paginaActual === 1 ? 'disabled' : ''}>❮</button>
+                <span class="pagination-info">Página ${paginaActual} de ${totalPaginas}</span>
+                <button id="btn-next-ejercicio" class="btn-icon-small" ${paginaActual === totalPaginas ? 'disabled' : ''}>❯</button>
+            </div>
+        `;
+    }
     
     listaRegistros.innerHTML = registrosHTML;
     

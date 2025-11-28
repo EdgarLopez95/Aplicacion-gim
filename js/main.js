@@ -92,6 +92,11 @@ let currentlyEditingCategoriaId = null;
 let currentlyEditingEjercicioCategoriaId = null;
 let categoriaActual = null;
 
+// Variables de paginación para la vista de ejercicio
+let paginaActualEjercicio = 1;
+const REGISTROS_POR_PAGINA_EJERCICIO = 4;
+let registrosEjercicioGlobal = []; // Para guardar la copia completa
+
 // Función auxiliar para manejar el clic en el botón "Añadir Ejercicio"
 async function manejarClicAnadirEjercicio() {
     // Resetear el ID de edición a null
@@ -1879,6 +1884,50 @@ async function eliminarEjercicioBibliotecaHandler(ejercicioId, botonElement) {
     }
 }
 
+// Función auxiliar para renderizar registros paginados del ejercicio
+function renderizarRegistrosPaginados() {
+    // Calcular total de páginas
+    const totalPaginas = Math.ceil(registrosEjercicioGlobal.length / REGISTROS_POR_PAGINA_EJERCICIO) || 1;
+    
+    // Calcular índices
+    const inicio = (paginaActualEjercicio - 1) * REGISTROS_POR_PAGINA_EJERCICIO;
+    const fin = inicio + REGISTROS_POR_PAGINA_EJERCICIO;
+    
+    // Console logs para depuración
+    console.log("--- Paginación Ejercicio ---");
+    console.log("Total registros:", registrosEjercicioGlobal.length);
+    console.log("Mostrando página:", paginaActualEjercicio);
+    console.log("Indices:", inicio + " a " + fin);
+    
+    // Obtener el slice del array
+    const registrosSlice = registrosEjercicioGlobal.slice(inicio, fin);
+    
+    // Llamar a la función de UI existente con el slice y los parámetros de paginación
+    renderizarListaRegistros(registrosSlice, editarRegistro, eliminarRegistro, paginaActualEjercicio, totalPaginas);
+    
+    // Configurar event listeners para los botones de paginación
+    const btnPrev = document.getElementById('btn-prev-ejercicio');
+    const btnNext = document.getElementById('btn-next-ejercicio');
+    
+    if (btnPrev) {
+        btnPrev.addEventListener('click', function() {
+            if (paginaActualEjercicio > 1) {
+                paginaActualEjercicio--;
+                renderizarRegistrosPaginados();
+            }
+        });
+    }
+    
+    if (btnNext) {
+        btnNext.addEventListener('click', function() {
+            if (paginaActualEjercicio < totalPaginas) {
+                paginaActualEjercicio++;
+                renderizarRegistrosPaginados();
+            }
+        });
+    }
+}
+
 // Función para mostrar la vista de ejercicio (registro de progreso)
 async function mostrarVistaEjercicio(ejercicioId) {
     if (!entrenoActual) {
@@ -1893,19 +1942,26 @@ async function mostrarVistaEjercicio(ejercicioId) {
     
     ejercicioActual = ejercicio;
     
-    // Obtener registros (si existen)
+    // Obtener registros (si existen) y guardarlos en la variable global
     const registros = ejercicio.registros || [];
+    registrosEjercicioGlobal = registros;
+    
+    // Resetear la página a la primera
+    paginaActualEjercicio = 1;
     
     // Resetear el ID de edición de registro
     currentlyEditingRegistroId = null;
     
-    // 1. Renderizar la vista completa
-    renderizarEjercicioView(ejercicio, registros, editarRegistro, eliminarRegistro);
+    // 1. Renderizar la vista completa (pasar null o array vacío en registros)
+    renderizarEjercicioView(ejercicio, [], editarRegistro, eliminarRegistro);
     
     // 2. Mostrar la vista
     showView(getEjercicioView());
     
-    // 3. Actualizar breadcrumbs DESPUÉS de que el HTML esté en el DOM
+    // 3. Renderizar registros paginados después de que la vista esté en el DOM
+    renderizarRegistrosPaginados();
+    
+    // 4. Actualizar breadcrumbs DESPUÉS de que el HTML esté en el DOM
     // Usar setTimeout para asegurar que el DOM esté completamente renderizado
     setTimeout(() => {
         // Asegurarse de que entrenoActual y ejercicio estén disponibles
@@ -1922,7 +1978,7 @@ async function mostrarVistaEjercicio(ejercicioId) {
         }
     }, 10);
     
-    // 4. Configurar event listeners
+    // 5. Configurar event listeners
     configurarEventListenersEjercicioView();
     
     // El botón volver ahora se maneja con delegación de eventos global en initApp
@@ -2025,8 +2081,13 @@ async function manejarSubmitRegistro(e) {
         ejercicioActual = await obtenerEjercicio(entrenoActual.id, ejercicioActual.id);
         const registros = ejercicioActual.registros || [];
         
-        // Actualizar la lista de registros
-        renderizarListaRegistros(registros, editarRegistro, eliminarRegistro);
+        // Actualizar la variable global de registros
+        registrosEjercicioGlobal = registros;
+        // Resetear a la página 1 para mostrar el nuevo registro
+        paginaActualEjercicio = 1;
+        
+        // Actualizar la lista de registros usando paginación
+        renderizarRegistrosPaginados();
         
         // Limpiar el formulario
         form.reset();
@@ -2174,8 +2235,18 @@ async function eliminarRegistro(registroId, botonElement) {
         ejercicioActual = await obtenerEjercicio(entrenoActual.id, ejercicioActual.id);
         const registros = ejercicioActual.registros || [];
         
-        // Actualizar la lista de registros
-        renderizarListaRegistros(registros, editarRegistro, eliminarRegistro);
+        // Actualizar la variable global de registros
+        registrosEjercicioGlobal = registros;
+        // Ajustar la página actual si es necesario (si eliminamos el último registro de la última página)
+        const totalPaginas = Math.ceil(registrosEjercicioGlobal.length / REGISTROS_POR_PAGINA_EJERCICIO) || 1;
+        if (paginaActualEjercicio > totalPaginas && totalPaginas > 0) {
+            paginaActualEjercicio = totalPaginas;
+        } else if (totalPaginas === 0) {
+            paginaActualEjercicio = 1;
+        }
+        
+        // Actualizar la lista de registros usando paginación
+        renderizarRegistrosPaginados();
     } catch (error) {
         // 3. Manejar el error
     } finally {
