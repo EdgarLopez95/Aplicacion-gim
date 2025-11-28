@@ -76,6 +76,14 @@ import {
     formatearFechaVisual
 } from './ui.js';
 
+import {
+    obtenerUsuarioActual,
+    setUsuarioActual,
+    cerrarSesion,
+    obtenerPerfilActual,
+    PERFILES
+} from './userSession.js';
+
 // Referencia al botón cancelar (está en el HTML del modal)
 let btnCancelarEjercicio = null;
 
@@ -964,6 +972,89 @@ function configurarEventListenersPerfil() {
                 alert('Historial borrado correctamente');
             } catch (error) {
                 alert('Error al borrar el historial. Por favor, intenta de nuevo.');
+            }
+        });
+    }
+    
+    // Botón cerrar sesión / cambiar perfil
+    const btnCerrarSesion = document.getElementById('btn-cerrar-sesion');
+    if (btnCerrarSesion) {
+        btnCerrarSesion.addEventListener('click', function() {
+            if (confirm('¿Quieres cerrar sesión y cambiar de perfil?')) {
+                cerrarSesion();
+            }
+        });
+    }
+    
+    // Botón migrar datos (temporal, solo una vez)
+    const btnMigrarDatos = document.getElementById('btn-migrar-datos');
+    if (btnMigrarDatos) {
+        btnMigrarDatos.addEventListener('click', async function() {
+            const confirmar = confirm('⚠️ ¿Estás seguro de que quieres migrar los datos?\n\nEsto copiará todos los datos antiguos a la nueva estructura privada del usuario "edgar".\n\nSOLO EJECUTAR UNA VEZ.');
+            if (!confirmar) return;
+            
+            // Deshabilitar el botón durante la migración
+            btnMigrarDatos.disabled = true;
+            btnMigrarDatos.textContent = '🔄 Migrando...';
+            
+            try {
+                // Importar y ejecutar la migración
+                const { migrarDatos } = await import('./migration.js');
+                
+                console.log('🚀 Iniciando migración de datos...');
+                console.log('📦 Migrando entrenos...');
+                console.log('📦 Migrando historial...');
+                console.log('📦 Migrando categorías...');
+                
+                await migrarDatos();
+                
+                console.log('✅ Migración completada');
+                alert('✅ Migración completada exitosamente!\n\nTodos los datos han sido copiados a la nueva estructura privada.');
+                
+                // Ocultar el botón después de la migración exitosa
+                btnMigrarDatos.style.display = 'none';
+            } catch (error) {
+                console.error('❌ Error durante la migración:', error);
+                alert('❌ Error durante la migración:\n\n' + error.message);
+                
+                // Rehabilitar el botón en caso de error
+                btnMigrarDatos.disabled = false;
+                btnMigrarDatos.textContent = '🛠️ MIGRAR DATOS (SOLO UNA VEZ)';
+            }
+        });
+    }
+    
+    // Botón migrar ejercicios internos (temporal, solo una vez)
+    const btnMigrarEjercicios = document.getElementById('btn-migrar-ejercicios');
+    if (btnMigrarEjercicios) {
+        btnMigrarEjercicios.addEventListener('click', async function() {
+            const confirmar = confirm('⚠️ ¿Estás seguro de que quieres migrar los ejercicios internos de los entrenos?\n\nEsto copiará todos los ejercicios que están dentro de cada entreno a la nueva estructura privada del usuario "edgar".\n\nSOLO EJECUTAR UNA VEZ.');
+            if (!confirmar) return;
+            
+            // Deshabilitar el botón durante la migración
+            btnMigrarEjercicios.disabled = true;
+            btnMigrarEjercicios.textContent = '🔄 Migrando ejercicios...';
+            
+            try {
+                // Importar y ejecutar la migración
+                const { migrarSubcoleccionesEntrenos } = await import('./migration.js');
+                
+                console.log('🚀 Iniciando migración de ejercicios internos de entrenos...');
+                
+                await migrarSubcoleccionesEntrenos();
+                
+                console.log('✅ Migración de ejercicios internos completada');
+                alert('✅ Migración de ejercicios internos completada exitosamente!\n\nTodos los ejercicios dentro de los entrenos han sido copiados a la nueva estructura privada.');
+                
+                // Ocultar el botón después de la migración exitosa
+                btnMigrarEjercicios.style.display = 'none';
+            } catch (error) {
+                console.error('❌ Error durante la migración de ejercicios internos:', error);
+                alert('❌ Error durante la migración de ejercicios internos:\n\n' + error.message);
+                
+                // Rehabilitar el botón en caso de error
+                btnMigrarEjercicios.disabled = false;
+                btnMigrarEjercicios.textContent = '🛠️ MIGRAR EJERCICIOS INTERNOS';
             }
         });
     }
@@ -2891,6 +2982,73 @@ async function cachearImagenesManualmente(entrenos) {
 // Función para inicializar la aplicación
 async function initApp() {
     try {
+        // Verificar si existe un usuario en localStorage
+        const usuarioId = obtenerUsuarioActual();
+        const modalSeleccionPerfil = document.getElementById('modal-seleccion-perfil');
+        const mainHeader = document.getElementById('main-header');
+        const mainContainer = document.querySelector('.main-container');
+        const tabBar = document.getElementById('tab-bar');
+        
+        if (!usuarioId) {
+            // NO existe usuario: Mostrar modal de selección y ocultar el resto
+            if (modalSeleccionPerfil) {
+                modalSeleccionPerfil.style.display = 'flex';
+            }
+            if (mainHeader) {
+                mainHeader.style.display = 'none';
+            }
+            if (mainContainer) {
+                mainContainer.style.display = 'none';
+            }
+            if (tabBar) {
+                tabBar.style.display = 'none';
+            }
+            
+            // Configurar event listeners para los botones de perfil
+            const perfilCards = document.querySelectorAll('.perfil-card');
+            perfilCards.forEach(card => {
+                card.addEventListener('click', function() {
+                    const usuarioIdSeleccionado = this.dataset.usuarioId;
+                    if (usuarioIdSeleccionado) {
+                        setUsuarioActual(usuarioIdSeleccionado);
+                    }
+                });
+            });
+            
+            // Detener la ejecución aquí - no cargar el resto de la app
+            return;
+        }
+        
+        // SÍ existe usuario: Ocultar modal y continuar normalmente
+        if (modalSeleccionPerfil) {
+            modalSeleccionPerfil.style.display = 'none';
+        }
+        if (mainHeader) {
+            mainHeader.style.display = 'flex';
+        }
+        if (mainContainer) {
+            mainContainer.style.display = 'flex';
+        }
+        if (tabBar) {
+            tabBar.style.display = 'flex';
+        }
+        
+        console.log("Usuario activo:", usuarioId);
+        
+        // Actualizar header con información del usuario
+        const perfil = obtenerPerfilActual();
+        if (perfil) {
+            const profilePic = document.querySelector('.profile-pic');
+            const headerGreeting = document.querySelector('.header-greeting');
+            if (profilePic) {
+                profilePic.src = perfil.avatar;
+                profilePic.alt = perfil.nombre;
+            }
+            if (headerGreeting) {
+                headerGreeting.textContent = `¡Hola, ${perfil.nombre}!`;
+            }
+        }
+        
         // Actualizar nombres de entrenos (ejecutar una vez, luego comentar)
         // await actualizarNombresEntrenos();
         

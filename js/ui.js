@@ -1709,6 +1709,18 @@ export function renderizarPerfilView(datosPerfil = {}) {
         <button id="btn-editar-perfil" class="btn btn-editar-perfil">Editar Perfil</button>
         <button id="btn-registrar-medicion" class="btn btn-registrar-medicion">Registrar Medición</button>
         
+        <div style="margin-top: 30px; margin-bottom: 20px; border-top: 1px solid #333; padding-top: 20px;">
+            <button id="btn-migrar-datos" class="btn btn-secondary" style="width: 100%; border-color: #ff9f0a; color: #ff9f0a; margin-bottom: 10px;">
+                🛠️ MIGRAR DATOS (SOLO UNA VEZ)
+            </button>
+            <button id="btn-migrar-ejercicios" class="btn btn-secondary" style="width: 100%; border-color: #ff9f0a; color: #ff9f0a; margin-bottom: 10px;">
+                🛠️ MIGRAR EJERCICIOS INTERNOS
+            </button>
+            <button id="btn-cerrar-sesion" class="btn btn-secondary" style="width: 100%; border-color: #ff4444; color: #ff4444;">
+                Cerrar Sesión / Cambiar Perfil
+            </button>
+        </div>
+        
         <!-- Modal de edición de perfil -->
         <div id="modal-perfil" class="modal" style="display: none;">
             <div class="modal-content">

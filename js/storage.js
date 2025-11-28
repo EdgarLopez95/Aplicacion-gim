@@ -1,6 +1,7 @@
 // storage.js - Lógica de Firebase (Firestore y Storage)
 
 import { db, storage } from './firebase-config.js';
+import { obtenerUsuarioActual } from './userSession.js';
 import {
     collection,
     doc,
@@ -137,10 +138,64 @@ export async function getDocCacheFirst(docRef) {
     };
 }
 
+// ============================================
+// HELPER DE RUTAS DINÁMICAS POR USUARIO
+// ============================================
+
+/**
+ * Función auxiliar para obtener la ruta de la colección según el usuario activo
+ * @param {string} collectionName - Nombre de la colección
+ * @returns {string} Ruta completa de la colección/documento
+ */
+function getCollectionPath(collectionName) {
+    const userId = obtenerUsuarioActual();
+    
+    // Si no hay usuario (ej: pantalla de login), retornamos null o lanzamos error según prefieras,
+    // pero para evitar errores en carga inicial, si no hay user, devolvemos la colección raíz (temporalmente)
+    // o manejamos el error.
+    if (!userId) {
+        console.warn("No hay usuario activo, usando ruta pública temporal o fallando.");
+        // Opcional: throw new Error("Usuario no autenticado");
+        return collectionName; 
+    }
+
+    // Prefijo base para todo: usuarios/{userId}
+    const userBasePath = `usuarios/${userId}`;
+
+    // Mapeo de colecciones a rutas privadas
+    switch (collectionName) {
+        // Biblioteca y Categorías (AHORA SON PRIVADAS TAMBIÉN)
+        case 'categoriasMusculares':
+            return `${userBasePath}/categoriasMusculares`;
+
+        case 'bibliotecaEjercicios':
+            return `${userBasePath}/bibliotecaEjercicios`;
+
+        // Datos de Entreno y Progreso
+        case 'entrenos':
+            return `${userBasePath}/entrenos`;
+
+        case 'historialDias':
+            return `${userBasePath}/historialDias`;
+
+        case 'historialCorporal':
+            return `${userBasePath}/historialCorporal`;
+
+        // Documento de Perfil
+        case 'mi_perfil': 
+            // Nota: Esto devolverá la ruta al DOCUMENTO específico
+            return `${userBasePath}/perfil/datos`; 
+
+        default:
+            // Por defecto, meter cualquier otra cosa dentro del usuario también
+            return `${userBasePath}/${collectionName}`;
+    }
+}
+
 // Función para cargar entrenos desde Firestore
 export async function cargarEntrenos() {
     try {
-        const entrenosCollection = collection(db, 'entrenos');
+        const entrenosCollection = collection(db, getCollectionPath('entrenos'));
         const snapshot = await getDocsCacheFirst(entrenosCollection);
         
         if (snapshot.empty) {
@@ -180,7 +235,7 @@ export async function actualizarNombreEntreno(entrenoId, nuevoNombre) {
             throw new Error(`Entreno con ID ${entrenoId} no encontrado`);
         }
         
-        const entrenoRef = doc(db, 'entrenos', entreno.firestoreId);
+        const entrenoRef = doc(db, getCollectionPath('entrenos'), entreno.firestoreId);
         await updateDoc(entrenoRef, {
             nombre: nuevoNombre
         });
@@ -299,7 +354,7 @@ export async function obtenerEjerciciosDeEntreno(entrenoId) {
             firestoreId = entreno.firestoreId;
         }
         
-        const ejerciciosCollection = collection(db, `entrenos/${firestoreId}/ejercicios`);
+        const ejerciciosCollection = collection(db, `${getCollectionPath('entrenos')}/${firestoreId}/ejercicios`);
         const q = query(ejerciciosCollection, orderBy('id', 'asc'));
         const snapshot = await getDocsCacheFirst(q);
         
@@ -315,7 +370,7 @@ export async function obtenerEjerciciosDeEntreno(entrenoId) {
                 return categoriasCache.get(categoriaId);
             }
             try {
-                const categoriaRef = doc(db, 'categoriasMusculares', categoriaId);
+                const categoriaRef = doc(db, getCollectionPath('categoriasMusculares'), categoriaId);
                 const categoriaDoc = await getDocCacheFirst(categoriaRef);
                 if (categoriaDoc.exists()) {
                     const nombreCategoria = categoriaDoc.data().nombre || '';
@@ -341,7 +396,7 @@ export async function obtenerEjerciciosDeEntreno(entrenoId) {
             // Si tiene bibliotecaId, leer datos desde la biblioteca
             if (ejercicioEntreno.bibliotecaId && ejercicioEntreno.categoriaId) {
                 try {
-                    const ejercicioBibliotecaRef = doc(db, `categoriasMusculares/${ejercicioEntreno.categoriaId}/ejercicios`, ejercicioEntreno.bibliotecaId);
+                    const ejercicioBibliotecaRef = doc(db, `${getCollectionPath('categoriasMusculares')}/${ejercicioEntreno.categoriaId}/ejercicios`, ejercicioEntreno.bibliotecaId);
                     const ejercicioBibliotecaDoc = await getDocCacheFirst(ejercicioBibliotecaRef);
                     
                     // Obtener nombre de la categoría
@@ -510,7 +565,7 @@ export async function agregarEjercicioAEntreno(entrenoId, ejercicio) {
         // Si el ejercicio viene de la biblioteca (tiene IDs), buscamos su historial
         if (ejercicio.bibliotecaId && ejercicio.categoriaId) {
             try {
-                const docRef = doc(db, 'categoriasMusculares', ejercicio.categoriaId, 'ejercicios', ejercicio.bibliotecaId);
+                const docRef = doc(db, getCollectionPath('categoriasMusculares'), ejercicio.categoriaId, 'ejercicios', ejercicio.bibliotecaId);
                 const docSnap = await getDocCacheFirst(docRef);
                 if (docSnap.exists() && docSnap.data().registros) {
                     registrosIniciales = docSnap.data().registros;
@@ -532,7 +587,7 @@ export async function agregarEjercicioAEntreno(entrenoId, ejercicio) {
         };
         
         // Agregar a Firestore usando el firestoreId
-        const ejerciciosCollection = collection(db, `entrenos/${firestoreId}/ejercicios`);
+        const ejerciciosCollection = collection(db, `${getCollectionPath('entrenos')}/${firestoreId}/ejercicios`);
         await addDoc(ejerciciosCollection, ejercicioData);
     } catch (error) {
         throw error;
@@ -555,7 +610,7 @@ export async function toggleCompletadoEjercicio(entrenoId, ejercicioId, estado, 
         const firestoreId = await obtenerFirestoreIdDeEntreno(entrenoId);
         
         // 2. Buscar el documento del ejercicio en Firestore
-        const ejerciciosCollection = collection(db, `entrenos/${firestoreId}/ejercicios`);
+        const ejerciciosCollection = collection(db, `${getCollectionPath('entrenos')}/${firestoreId}/ejercicios`);
         const snapshot = await getDocsCacheFirst(ejerciciosCollection);
         
         let docId = null;
@@ -570,7 +625,7 @@ export async function toggleCompletadoEjercicio(entrenoId, ejercicioId, estado, 
         }
         
         // 3. Referencia al ejercicio dentro del entreno
-        const ejercicioRef = doc(db, `entrenos/${firestoreId}/ejercicios/${docId}`);
+        const ejercicioRef = doc(db, `${getCollectionPath('entrenos')}/${firestoreId}/ejercicios/${docId}`);
         
         // 4. Determinar la fecha (String local)
         // Si estado es 'completado' (marcado) -> fecha de hoy. Si no -> null.
@@ -586,7 +641,7 @@ export async function toggleCompletadoEjercicio(entrenoId, ejercicioId, estado, 
         // 6. ACTUALIZAR EL HISTORIAL DEL DÍA (Para el Calendario)
         // Solo si tenemos el nombre y el total (si no, es un toggle rápido que no afecta historial global)
         if (entrenoNombre && totalEjercicios) {
-            const historialRef = doc(db, 'historialDias', fechaString);
+            const historialRef = doc(db, getCollectionPath('historialDias'), fechaString);
             const historialSnap = await getDocCacheFirst(historialRef);
             
             let cantidadActual = 0;
@@ -629,7 +684,7 @@ export async function eliminarEjercicioDeEntreno(entrenoId, ejercicioId) {
         const firestoreId = await obtenerFirestoreIdDeEntreno(entrenoId);
         
         // Buscar el documento en Firestore
-        const ejerciciosCollection = collection(db, `entrenos/${firestoreId}/ejercicios`);
+        const ejerciciosCollection = collection(db, `${getCollectionPath('entrenos')}/${firestoreId}/ejercicios`);
         const snapshot = await getDocsCacheFirst(ejerciciosCollection);
         
         let docId = null;
@@ -640,7 +695,7 @@ export async function eliminarEjercicioDeEntreno(entrenoId, ejercicioId) {
         });
         
         if (docId) {
-            await deleteDoc(doc(db, `entrenos/${firestoreId}/ejercicios/${docId}`));
+            await deleteDoc(doc(db, `${getCollectionPath('entrenos')}/${firestoreId}/ejercicios/${docId}`));
         } else {
             throw new Error('Ejercicio no encontrado en Firestore');
         }
@@ -661,7 +716,7 @@ export async function actualizarEjercicioEnEntreno(entrenoId, ejercicioActualiza
         const firestoreId = await obtenerFirestoreIdDeEntreno(entrenoId);
         
         // Buscar el documento en Firestore
-        const ejerciciosCollection = collection(db, `entrenos/${firestoreId}/ejercicios`);
+        const ejerciciosCollection = collection(db, `${getCollectionPath('entrenos')}/${firestoreId}/ejercicios`);
         const snapshot = await getDocsCacheFirst(ejerciciosCollection);
         
         let docId = null;
@@ -716,7 +771,7 @@ export async function actualizarEjercicioEnEntreno(entrenoId, ejercicioActualiza
             return reg;
         });
         
-        const ejercicioRef = doc(db, `entrenos/${firestoreId}/ejercicios/${docId}`);
+        const ejercicioRef = doc(db, `${getCollectionPath('entrenos')}/${firestoreId}/ejercicios/${docId}`);
         await updateDoc(ejercicioRef, {
             nombre: ejercicioActualizado.nombre,
             imagenUrl: imagenUrl,
@@ -750,7 +805,7 @@ export async function sustituirEjercicioEnEntreno(entrenoId, ejercicioIdOriginal
         // Obtener los registros del ejercicio de la biblioteca
         let registrosDelEjercicio = [];
         try {
-            const ejercicioBibliotecaRef = doc(db, `categoriasMusculares/${nuevoEjercicioCategoriaId}/ejercicios`, nuevoEjercicioBibliotecaId);
+            const ejercicioBibliotecaRef = doc(db, `${getCollectionPath('categoriasMusculares')}/${nuevoEjercicioCategoriaId}/ejercicios`, nuevoEjercicioBibliotecaId);
             const ejercicioBibliotecaDoc = await getDoc(ejercicioBibliotecaRef);
             if (ejercicioBibliotecaDoc.exists()) {
                 const data = ejercicioBibliotecaDoc.data();
@@ -761,7 +816,7 @@ export async function sustituirEjercicioEnEntreno(entrenoId, ejercicioIdOriginal
         }
         
         // Buscar el documento en Firestore del ejercicio original
-        const ejerciciosCollection = collection(db, `entrenos/${firestoreId}/ejercicios`);
+        const ejerciciosCollection = collection(db, `${getCollectionPath('entrenos')}/${firestoreId}/ejercicios`);
         const snapshot = await getDocsCacheFirst(ejerciciosCollection);
         
         let docId = null;
@@ -777,7 +832,7 @@ export async function sustituirEjercicioEnEntreno(entrenoId, ejercicioIdOriginal
         
         // Actualizar el ejercicio manteniendo su ID y posición, pero cambiando los datos
         // IMPORTANTE: Recuperar los registros del ejercicio de la biblioteca
-        const ejercicioRef = doc(db, `entrenos/${firestoreId}/ejercicios/${docId}`);
+        const ejercicioRef = doc(db, `${getCollectionPath('entrenos')}/${firestoreId}/ejercicios/${docId}`);
         await updateDoc(ejercicioRef, {
             nombre: nuevoEjercicio.nombre,
             imagenUrl: nuevoEjercicio.imagenUrl,
@@ -866,7 +921,7 @@ export async function agregarRegistroAEjercicio(entrenoId, ejercicioId, nuevoReg
         // Sincronizar con la biblioteca si el ejercicio tiene bibliotecaId
         if (ejercicio.bibliotecaId && ejercicio.categoriaId) {
             try {
-                const ejercicioBibliotecaRef = doc(db, `categoriasMusculares/${ejercicio.categoriaId}/ejercicios`, ejercicio.bibliotecaId);
+                const ejercicioBibliotecaRef = doc(db, `${getCollectionPath('categoriasMusculares')}/${ejercicio.categoriaId}/ejercicios`, ejercicio.bibliotecaId);
                 await updateDoc(ejercicioBibliotecaRef, {
                     registros: registros
                 });
@@ -907,7 +962,7 @@ export async function eliminarRegistroDeEjercicio(entrenoId, ejercicioId, regist
         // Sincronizar con la biblioteca si el ejercicio tiene bibliotecaId
         if (ejercicio.bibliotecaId && ejercicio.categoriaId) {
             try {
-                const ejercicioBibliotecaRef = doc(db, `categoriasMusculares/${ejercicio.categoriaId}/ejercicios`, ejercicio.bibliotecaId);
+                const ejercicioBibliotecaRef = doc(db, `${getCollectionPath('categoriasMusculares')}/${ejercicio.categoriaId}/ejercicios`, ejercicio.bibliotecaId);
                 await updateDoc(ejercicioBibliotecaRef, {
                     registros: registros
                 });
@@ -970,7 +1025,7 @@ export async function actualizarRegistroEnEjercicio(entrenoId, ejercicioId, regi
         // Sincronizar con la biblioteca si el ejercicio tiene bibliotecaId
         if (ejercicio.bibliotecaId && ejercicio.categoriaId) {
             try {
-                const ejercicioBibliotecaRef = doc(db, `categoriasMusculares/${ejercicio.categoriaId}/ejercicios`, ejercicio.bibliotecaId);
+                const ejercicioBibliotecaRef = doc(db, `${getCollectionPath('categoriasMusculares')}/${ejercicio.categoriaId}/ejercicios`, ejercicio.bibliotecaId);
                 await updateDoc(ejercicioBibliotecaRef, {
                     registros: registros
                 });
@@ -1003,7 +1058,7 @@ export async function convertirImagenABase64(file) {
 // Función para agregar una categoría muscular
 export async function agregarCategoria(nombreCategoria) {
     try {
-        const categoriasCollection = collection(db, 'categoriasMusculares');
+        const categoriasCollection = collection(db, getCollectionPath('categoriasMusculares'));
         
         // Preparar los datos para guardar
         const datosParaGuardar = {
@@ -1023,7 +1078,7 @@ export async function agregarCategoria(nombreCategoria) {
 // Función para obtener todas las categorías musculares
 export async function obtenerCategorias() {
     try {
-        const categoriasCollection = collection(db, 'categoriasMusculares');
+        const categoriasCollection = collection(db, getCollectionPath('categoriasMusculares'));
         const q = query(categoriasCollection, orderBy('fechaCreacion', 'asc'));
         const snapshot = await getDocsCacheFirst(q);
         
@@ -1049,7 +1104,7 @@ export async function obtenerCategorias() {
 // Función para editar una categoría muscular
 export async function editarCategoria(id, nuevoNombre) {
     try {
-        const categoriaRef = doc(db, 'categoriasMusculares', id);
+        const categoriaRef = doc(db, getCollectionPath('categoriasMusculares'), id);
         
         // Actualizar el documento
         await updateDoc(categoriaRef, {
@@ -1064,7 +1119,7 @@ export async function editarCategoria(id, nuevoNombre) {
 export async function eliminarCategoria(id) {
     try {
         // Primero, eliminar todos los ejercicios de la subcolección
-        const ejerciciosCollection = collection(db, `categoriasMusculares/${id}/ejercicios`);
+        const ejerciciosCollection = collection(db, `${getCollectionPath('categoriasMusculares')}/${id}/ejercicios`);
         const ejerciciosSnapshot = await getDocs(ejerciciosCollection);
         
         // Eliminar cada ejercicio y su imagen
@@ -1078,14 +1133,14 @@ export async function eliminarCategoria(id) {
             }
             
             // Eliminar documento del ejercicio
-            promesasEliminacion.push(deleteDoc(doc(db, `categoriasMusculares/${id}/ejercicios/${ejercicioDoc.id}`)));
+            promesasEliminacion.push(deleteDoc(doc(db, `${getCollectionPath('categoriasMusculares')}/${id}/ejercicios/${ejercicioDoc.id}`)));
         });
         
         // Esperar a que se eliminen todos los ejercicios
         await Promise.all(promesasEliminacion);
         
         // Finalmente, eliminar la categoría
-        const categoriaRef = doc(db, 'categoriasMusculares', id);
+        const categoriaRef = doc(db, getCollectionPath('categoriasMusculares'), id);
         await deleteDoc(categoriaRef);
     } catch (error) {
         throw error;
@@ -1120,7 +1175,7 @@ async function subirImagenEjercicioCategoriaAStorage(categoriaId, ejercicioId, a
 // Función para agregar un ejercicio a una categoría
 export async function agregarEjercicioACategoria(categoriaId, ejercicioData) {
     try {
-        const categoriaRef = doc(db, 'categoriasMusculares', categoriaId);
+        const categoriaRef = doc(db, getCollectionPath('categoriasMusculares'), categoriaId);
         const ejerciciosCollection = collection(categoriaRef, 'ejercicios');
         
         // Si hay un archivo de imagen, subirlo primero
@@ -1150,7 +1205,7 @@ export async function agregarEjercicioACategoria(categoriaId, ejercicioData) {
 // Función para obtener todos los ejercicios de una categoría
 export async function obtenerEjerciciosDeCategoria(categoriaId) {
     try {
-        const categoriaRef = doc(db, 'categoriasMusculares', categoriaId);
+        const categoriaRef = doc(db, getCollectionPath('categoriasMusculares'), categoriaId);
         const ejerciciosCollection = collection(categoriaRef, 'ejercicios');
         const q = query(ejerciciosCollection, orderBy('fechaCreacion', 'asc'));
         const snapshot = await getDocsCacheFirst(q);
@@ -1228,10 +1283,10 @@ export async function obtenerTodosLosEjerciciosDeBiblioteca() {
 // Función para editar un ejercicio de una categoría
 export async function editarEjercicioDeCategoria(categoriaId, ejercicioId, ejercicioData) {
     try {
-        const ejercicioRef = doc(db, `categoriasMusculares/${categoriaId}/ejercicios/${ejercicioId}`);
+        const ejercicioRef = doc(db, `${getCollectionPath('categoriasMusculares')}/${categoriaId}/ejercicios/${ejercicioId}`);
         
         // Obtener el ejercicio existente para mantener la imagen si no se cambia
-        const ejercicioSnapshot = await getDocs(collection(db, `categoriasMusculares/${categoriaId}/ejercicios`));
+        const ejercicioSnapshot = await getDocs(collection(db, `${getCollectionPath('categoriasMusculares')}/${categoriaId}/ejercicios`));
         let ejercicioExistente = null;
         ejercicioSnapshot.forEach(docSnapshot => {
             if (docSnapshot.id === ejercicioId) {
@@ -1272,8 +1327,8 @@ export async function editarEjercicioDeCategoria(categoriaId, ejercicioId, ejerc
 export async function eliminarEjercicioDeCategoria(categoriaId, ejercicioId) {
     try {
         // Obtener el ejercicio para eliminar su imagen
-        const ejercicioRef = doc(db, `categoriasMusculares/${categoriaId}/ejercicios/${ejercicioId}`);
-        const ejercicioSnapshot = await getDocs(collection(db, `categoriasMusculares/${categoriaId}/ejercicios`));
+        const ejercicioRef = doc(db, `${getCollectionPath('categoriasMusculares')}/${categoriaId}/ejercicios/${ejercicioId}`);
+        const ejercicioSnapshot = await getDocs(collection(db, `${getCollectionPath('categoriasMusculares')}/${categoriaId}/ejercicios`));
         
         let imagenUrl = null;
         ejercicioSnapshot.forEach(docSnapshot => {
@@ -1307,7 +1362,8 @@ export async function eliminarEjercicioDeCategoria(categoriaId, ejercicioId) {
 // Función para guardar/actualizar el perfil del usuario
 export async function guardarPerfil(datos) {
     try {
-        const perfilRef = doc(db, 'usuarios', 'mi_perfil');
+        const perfilPath = getCollectionPath('mi_perfil');
+        const perfilRef = doc(db, perfilPath);
         await setDoc(perfilRef, {
             nombre: datos.nombre || '',
             peso: datos.peso || null,
@@ -1325,7 +1381,8 @@ export async function guardarPerfil(datos) {
 // Función para obtener el perfil del usuario
 export async function obtenerPerfil() {
     try {
-        const perfilRef = doc(db, 'usuarios', 'mi_perfil');
+        const perfilPath = getCollectionPath('mi_perfil');
+        const perfilRef = doc(db, perfilPath);
         const perfilSnap = await getDocCacheFirst(perfilRef);
         
         if (perfilSnap.exists()) {
@@ -1385,7 +1442,7 @@ export async function guardarMedicion(datos) {
             timestamp: fechaStringATimestamp(fechaString)
         };
         
-        const historialCollection = collection(db, 'historialCorporal');
+        const historialCollection = collection(db, getCollectionPath('historialCorporal'));
         await addDoc(historialCollection, medicionData);
         
         return true;
@@ -1397,7 +1454,7 @@ export async function guardarMedicion(datos) {
 // Función para obtener el historial corporal
 export async function obtenerHistorialCorporal() {
     try {
-        const historialCollection = collection(db, 'historialCorporal');
+        const historialCollection = collection(db, getCollectionPath('historialCorporal'));
         const q = query(historialCollection, orderBy('timestamp', 'asc'));
         const snapshot = await getDocsCacheFirst(q);
         
@@ -1418,7 +1475,7 @@ export async function obtenerHistorialCorporal() {
 // Función para actualizar una medición existente
 export async function actualizarMedicion(id, datos) {
     try {
-        const medicionRef = doc(db, 'historialCorporal', id);
+        const medicionRef = doc(db, getCollectionPath('historialCorporal'), id);
         // Guardar la fecha como string YYYY-MM-DD directamente, sin conversión a ISO
         // Si no viene fecha, usar fecha local
         let fechaString = datos.fecha;
@@ -1451,7 +1508,7 @@ export async function actualizarMedicion(id, datos) {
 // Función para eliminar una medición específica
 export async function eliminarMedicion(id) {
     try {
-        const medicionRef = doc(db, 'historialCorporal', id);
+        const medicionRef = doc(db, getCollectionPath('historialCorporal'), id);
         await deleteDoc(medicionRef);
         
         return true;
@@ -1463,7 +1520,7 @@ export async function eliminarMedicion(id) {
 // Función para borrar todo el historial corporal (solo para desarrollo)
 export async function borrarTodoHistorialCorporal() {
     try {
-        const historialCollection = collection(db, 'historialCorporal');
+        const historialCollection = collection(db, getCollectionPath('historialCorporal'));
         const snapshot = await getDocsCacheFirst(historialCollection);
         
         const deletePromises = [];
@@ -1509,7 +1566,7 @@ async function subirImagenBibliotecaAStorage(ejercicioId, archivo) {
 // Función para agregar un ejercicio a la biblioteca
 export async function agregarEjercicioABiblioteca(ejercicioData) {
     try {
-        const bibliotecaCollection = collection(db, 'bibliotecaEjercicios');
+        const bibliotecaCollection = collection(db, getCollectionPath('bibliotecaEjercicios'));
         
         // Si hay un archivo de imagen, subirlo primero
         let imagenUrl = ejercicioData.imagenUrl || null;
@@ -1539,7 +1596,7 @@ export async function agregarEjercicioABiblioteca(ejercicioData) {
 // Función para obtener todos los ejercicios de la biblioteca
 export async function obtenerEjerciciosBiblioteca() {
     try {
-        const bibliotecaCollection = collection(db, 'bibliotecaEjercicios');
+        const bibliotecaCollection = collection(db, getCollectionPath('bibliotecaEjercicios'));
         const q = query(bibliotecaCollection, orderBy('fechaCreacion', 'desc'));
         const snapshot = await getDocsCacheFirst(q);
         
@@ -1567,7 +1624,7 @@ export async function obtenerEjerciciosBiblioteca() {
 // Función para editar un ejercicio de la biblioteca
 export async function editarEjercicioBiblioteca(id, data) {
     try {
-        const ejercicioRef = doc(db, 'bibliotecaEjercicios', id);
+        const ejercicioRef = doc(db, getCollectionPath('bibliotecaEjercicios'), id);
         
         // Obtener el ejercicio actual para verificar si hay imagen existente
         const ejercicioDoc = await getDocCacheFirst(ejercicioRef);
@@ -1605,7 +1662,7 @@ export async function editarEjercicioBiblioteca(id, data) {
 // Función para eliminar un ejercicio de la biblioteca
 export async function eliminarEjercicioBiblioteca(id) {
     try {
-        const ejercicioRef = doc(db, 'bibliotecaEjercicios', id);
+        const ejercicioRef = doc(db, getCollectionPath('bibliotecaEjercicios'), id);
         
         // Paso 1: Obtener el ejercicio para eliminar su imagen si existe
         const ejercicioDoc = await getDocCacheFirst(ejercicioRef);
@@ -1622,12 +1679,12 @@ export async function eliminarEjercicioBiblioteca(id) {
         
         // Paso 2: Buscar y eliminar referencias en todos los entrenos
         // 1. Obtener todos los entrenos
-        const entrenosSnap = await getDocsCacheFirst(collection(db, 'entrenos'));
+        const entrenosSnap = await getDocsCacheFirst(collection(db, getCollectionPath('entrenos')));
         
         // 2. Recorrer cada entreno
         for (const entrenoDoc of entrenosSnap.docs) {
             // 3. Buscar en la subcolección 'ejercicios' de este entreno
-            const ejerciciosRef = collection(db, 'entrenos', entrenoDoc.id, 'ejercicios');
+            const ejerciciosRef = collection(db, getCollectionPath('entrenos'), entrenoDoc.id, 'ejercicios');
             const q = query(ejerciciosRef, where('bibliotecaId', '==', id));
             const querySnapshot = await getDocsCacheFirst(q);
             
@@ -1648,7 +1705,7 @@ export async function eliminarEjercicioBiblioteca(id) {
 // Función para obtener todos los días entrenados con datos enriquecidos
 export async function obtenerDiasEntrenados() {
     try {
-        const historialCollection = collection(db, 'historialDias');
+        const historialCollection = collection(db, getCollectionPath('historialDias'));
         // NO usar orderBy('timestamp') porque los documentos antiguos pueden no tener ese campo
         // Simplemente obtener todos los documentos y ordenar por el ID (que es la fecha)
         const snapshot = await getDocsCacheFirst(historialCollection);
