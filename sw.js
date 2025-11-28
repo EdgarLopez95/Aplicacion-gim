@@ -24,20 +24,14 @@ const FIREBASE_STORAGE_URL = 'https://firebasestorage.googleapis.com';
 // Evento: Instalación del Service Worker
 // Cachea los archivos estáticos de la App Shell
 self.addEventListener('install', event => {
-    console.log('🔧 Service Worker: Instalando...');
-    console.log('📋 Service Worker: Versión - STATIC_CACHE:', STATIC_CACHE, 'DYNAMIC_CACHE:', DYNAMIC_CACHE);
-    
     event.waitUntil(
         Promise.all([
             caches.open(STATIC_CACHE).then(cache => {
-                console.log('📦 Service Worker: Cacheando App Shell en STATIC_CACHE...');
                 return cache.addAll(APP_SHELL_FILES).catch(err => {
-                    console.warn('⚠️ Service Worker: Algunos archivos no se pudieron cachear:', err);
                     // Continuar aunque algunos archivos fallen
                 });
             }),
             caches.open(DYNAMIC_CACHE).then(cache => {
-                console.log('📦 Service Worker: DYNAMIC_CACHE inicializado para imágenes');
                 return cache;
             })
         ])
@@ -50,21 +44,13 @@ self.addEventListener('install', event => {
 // Evento: Activación del Service Worker
 // Limpia caches antiguos
 self.addEventListener('activate', event => {
-    console.log('✅ Service Worker: Activado');
-    console.log('📋 Service Worker: Caches activos - STATIC_CACHE:', STATIC_CACHE, 'DYNAMIC_CACHE:', DYNAMIC_CACHE);
-    
     event.waitUntil(
         caches.keys().then(cacheNames => {
-            console.log('📋 Service Worker: Caches encontrados:', cacheNames);
-            
             return Promise.all(
                 cacheNames.map(cacheName => {
                     // Eliminar caches antiguos (mantener solo STATIC_CACHE y DYNAMIC_CACHE)
                     if (cacheName !== STATIC_CACHE && cacheName !== DYNAMIC_CACHE) {
-                        console.log('🗑️ Service Worker: Eliminando cache antiguo:', cacheName);
                         return caches.delete(cacheName);
-                    } else {
-                        console.log('✅ Service Worker: Manteniendo cache:', cacheName);
                     }
                 })
             );
@@ -72,15 +58,13 @@ self.addEventListener('activate', event => {
             // Verificar que los caches estén creados
             return Promise.all([
                 caches.open(STATIC_CACHE).then(cache => {
-                    console.log('✅ Service Worker: STATIC_CACHE verificado');
                     return cache.keys().then(keys => {
-                        console.log('📦 Service Worker: Archivos en STATIC_CACHE:', keys.length);
+                        return keys;
                     });
                 }),
                 caches.open(DYNAMIC_CACHE).then(cache => {
-                    console.log('✅ Service Worker: DYNAMIC_CACHE verificado');
                     return cache.keys().then(keys => {
-                        console.log('🖼️ Service Worker: Imágenes en DYNAMIC_CACHE:', keys.length);
+                        return keys;
                     });
                 })
             ]);
@@ -93,10 +77,16 @@ self.addEventListener('activate', event => {
 
 // Evento: Interceptar peticiones
 self.addEventListener('fetch', event => {
+    // 1. IGNORAR MÉTODOS QUE NO SEAN GET (POST, PUT, DELETE, ETC)
+    // Esto es vital para permitir la subida de imágenes a Firebase
+    if (event.request.method !== 'GET') {
+        return; // Deja que la red maneje estas peticiones
+    }
+    
     const { request } = event;
     
-    // Ignorar peticiones que no sean GET o que sean de extensiones/chrome
-    if (request.method !== 'GET' || !request.url.startsWith('http')) {
+    // Ignorar peticiones que no sean HTTP/HTTPS (extensiones, chrome://, etc.)
+    if (!request.url.startsWith('http')) {
         return;
     }
 
@@ -105,7 +95,6 @@ self.addEventListener('fetch', event => {
     // ============================================
     // 1. ESTRATEGIA PARA IMÁGENES DE FIREBASE STORAGE
     // Cache First: Servir desde caché si está disponible, si no, intentar red
-    // Las imágenes se cachean usando mode: 'no-cors' desde main.js
     // ============================================
     if (url.hostname.includes('firebasestorage.googleapis.com')) {
         event.respondWith(
@@ -113,36 +102,45 @@ self.addEventListener('fetch', event => {
                 // Primero verificar si está en caché
                 return cache.match(request).then(cachedResponse => {
                     if (cachedResponse) {
-                        console.log('✅ Service Worker: Imagen servida desde caché:', request.url);
                         return cachedResponse;
                     }
                     
                     // Si NO está en caché, intentar la red
-                    // Usar mode: 'no-cors' para evitar problemas de CORS
-                    return fetch(request, {
-                        mode: 'no-cors'
-                    }).then(networkResponse => {
-                        // Las respuestas "opaque" (no-cors) siempre tienen status 0, pero se pueden cachear
-                        if (networkResponse) {
-                            // Cachear la respuesta para la próxima vez
+                    // Intentar primero con CORS normal
+                    return fetch(request).then(networkResponse => {
+                        // Si la respuesta es válida y no es opaque, cachearla
+                        if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
                             const responseToCache = networkResponse.clone();
-                            cache.put(request, responseToCache).then(() => {
-                                console.log('💾 Service Worker: Imagen cacheada desde red (opaque):', request.url);
-                            }).catch(err => {
-                                console.warn('⚠️ Service Worker: Error al cachear:', err);
+                            cache.put(request, responseToCache).catch(() => {
+                                // Error al cachear, continuar
                             });
                         }
                         return networkResponse;
-                    }).catch(error => {
-                        // Si la red falla, devolver error
-                        console.warn('⚠️ Service Worker: Error al cargar imagen:', request.url, error);
-                        throw error;
+                    }).catch(() => {
+                        // Si falla con CORS normal, intentar con no-cors como fallback
+                        return fetch(request, {
+                            mode: 'no-cors'
+                        }).then(networkResponse => {
+                            // Las respuestas "opaque" (no-cors) se pueden cachear pero tienen limitaciones
+                            if (networkResponse) {
+                                const responseToCache = networkResponse.clone();
+                                cache.put(request, responseToCache).catch(() => {
+                                    // Error al cachear, continuar
+                                });
+                            }
+                            return networkResponse;
+                        }).catch(error => {
+                            // Si todo falla, lanzar error
+                            throw error;
+                        });
                     });
                 });
             }).catch(error => {
-                console.error('❌ Service Worker: Error crítico con imagen:', error);
-                // Si hay error, intentar fetch normal como último recurso
-                return fetch(request);
+                // Si hay error crítico, intentar fetch normal como último recurso
+                return fetch(request).catch(() => {
+                    // Si incluso esto falla, devolver error
+                    throw error;
+                });
             })
         );
         return; // Terminar aquí para estas peticiones
@@ -230,7 +228,6 @@ self.addEventListener('fetch', event => {
             });
         }).catch(error => {
             // Manejo de errores críticos
-            console.error('❌ Service Worker: Error crítico en fetch:', error);
             // Intentar devolver index.html como último recurso
             if (request.destination === 'document') {
                 return caches.match('./index.html').then(fallbackResponse => {

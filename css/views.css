@@ -1022,6 +1022,33 @@
     gap: 12px;
 }
 
+.pagination-controls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 16px;
+    margin-top: 16px;
+}
+
+.pagination-info {
+    color: var(--text-secondary);
+    font-size: 14px;
+    min-width: 120px;
+    text-align: center;
+}
+
+.pagination-controls .btn-icon-small:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.pagination-controls .btn-icon-small:disabled:hover {
+    background-color: transparent;
+    color: var(--text-primary);
+    transform: none;
+}
+
 .historial-card {
     background-color: var(--bg-secondary);
     border-radius: 12px;

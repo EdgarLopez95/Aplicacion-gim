@@ -163,7 +163,6 @@ export async function cargarEntrenos() {
         
         return entrenos;
     } catch (error) {
-        console.error('Error al cargar entrenos desde Firestore:', error);
         throw error;
     }
 }
@@ -188,7 +187,6 @@ export async function actualizarNombreEntreno(entrenoId, nuevoNombre) {
         
         return true;
     } catch (error) {
-        console.error('Error al actualizar nombre del entreno:', error);
         throw error;
     }
 }
@@ -214,7 +212,6 @@ export async function subirImagenAStorage(entrenoId, ejercicioId, archivo) {
         
         return downloadURL;
     } catch (error) {
-        console.error('Error al subir imagen a Storage:', error);
         throw error;
     }
 }
@@ -256,7 +253,6 @@ function extraerRutaDeStorageUrl(imageUrl) {
         
         return path;
     } catch (error) {
-        console.warn('Error al extraer ruta de URL de Storage:', error);
         return null;
     }
 }
@@ -272,7 +268,6 @@ async function eliminarImagenDeStorage(imageUrl) {
         // Extraer la ruta del archivo de la URL
         const filePath = extraerRutaDeStorageUrl(imageUrl);
         if (!filePath) {
-            console.warn('No se pudo extraer la ruta del archivo de la URL:', imageUrl);
             return; // No es una URL válida de Firebase Storage
         }
         
@@ -282,9 +277,7 @@ async function eliminarImagenDeStorage(imageUrl) {
     } catch (error) {
         // Si el error es que el objeto no existe, solo registrar una advertencia
         if (error.code === 'storage/object-not-found' || error.message?.includes('object-not-found')) {
-            console.warn('La imagen no se encontró en Storage (puede que ya haya sido eliminada):', imageUrl);
         } else {
-            console.warn('Error al eliminar imagen de Storage (no crítico):', error);
         }
         // No lanzar error - permitir que la función continúe
     }
@@ -301,7 +294,6 @@ export async function obtenerEjerciciosDeEntreno(entrenoId) {
             const entrenos = await cargarEntrenos();
             const entreno = entrenos?.find(e => e.id === parseInt(entrenoId));
             if (!entreno || !entreno.firestoreId) {
-                console.error('Entreno no encontrado o sin firestoreId');
                 return [];
             }
             firestoreId = entreno.firestoreId;
@@ -331,7 +323,6 @@ export async function obtenerEjerciciosDeEntreno(entrenoId) {
                     return nombreCategoria;
                 }
             } catch (error) {
-                console.error(`Error al obtener categoría ${categoriaId}:`, error);
             }
             return '';
         };
@@ -414,7 +405,6 @@ export async function obtenerEjerciciosDeEntreno(entrenoId) {
                         });
                     }
                 } catch (error) {
-                    console.error(`Error al obtener ejercicio ${ejercicioEntreno.bibliotecaId} de la biblioteca:`, error);
                     // Si hay error, asumir que el ejercicio fue eliminado (marcar como huérfano)
                     const nombreCategoria = await obtenerNombreCategoria(ejercicioEntreno.categoriaId);
                     const fechaCompletado = ejercicioEntreno.fechaCompletado || null;
@@ -474,7 +464,6 @@ export async function obtenerEjerciciosDeEntreno(entrenoId) {
         
         return ejercicios;
     } catch (error) {
-        console.error('Error al cargar ejercicios desde Firestore:', error);
         return [];
     }
 }
@@ -527,7 +516,6 @@ export async function agregarEjercicioAEntreno(entrenoId, ejercicio) {
                     registrosIniciales = docSnap.data().registros;
                 }
             } catch (error) {
-                console.warn('No se pudo recuperar el historial antiguo:', error);
                 // Continuar con los registros que vengan en el objeto ejercicio o array vacío
             }
         }
@@ -547,7 +535,6 @@ export async function agregarEjercicioAEntreno(entrenoId, ejercicio) {
         const ejerciciosCollection = collection(db, `entrenos/${firestoreId}/ejercicios`);
         await addDoc(ejerciciosCollection, ejercicioData);
     } catch (error) {
-        console.error('Error al agregar ejercicio a Firestore:', error);
         throw error;
     }
 }
@@ -631,7 +618,6 @@ export async function toggleCompletadoEjercicio(entrenoId, ejercicioId, estado, 
         
         return nuevaFecha !== null;
     } catch (error) {
-        console.error("Error en toggleCompletadoEjercicio:", error);
         throw error;
     }
 }
@@ -664,7 +650,6 @@ export async function eliminarEjercicioDeEntreno(entrenoId, ejercicioId) {
         // 2. El ejercicio puede estar en otros entrenos
         // 3. La imagen solo debe eliminarse cuando se elimina PERMANENTEMENTE de la biblioteca
     } catch (error) {
-        console.error('Error al eliminar ejercicio del entreno:', error);
         throw error;
     }
 }
@@ -738,7 +723,6 @@ export async function actualizarEjercicioEnEntreno(entrenoId, ejercicioActualiza
             registros: registrosParaGuardar
         });
     } catch (error) {
-        console.error('Error al actualizar ejercicio en Firestore:', error);
         throw error;
     }
 }
@@ -773,7 +757,6 @@ export async function sustituirEjercicioEnEntreno(entrenoId, ejercicioIdOriginal
                 registrosDelEjercicio = data.registros || [];
             }
         } catch (error) {
-            console.error('Error al obtener registros de la biblioteca:', error);
             // Continuar con array vacío si falla
         }
         
@@ -804,7 +787,6 @@ export async function sustituirEjercicioEnEntreno(entrenoId, ejercicioIdOriginal
             // NO actualizar: id (se mantiene para preservar posición)
         });
     } catch (error) {
-        console.error('Error al sustituir ejercicio en Firestore:', error);
         throw error;
     }
 }
@@ -816,7 +798,6 @@ export async function obtenerEjercicio(entrenoId, ejercicioId) {
         const ejercicio = ejercicios.find(e => e.id === ejercicioId);
         return ejercicio || null;
     } catch (error) {
-        console.error('Error al obtener ejercicio:', error);
         return null;
     }
 }
@@ -838,7 +819,6 @@ export async function obtenerUltimoRegistro(entrenoId, ejercicioId) {
         // El primer registro es el más reciente (se agrega con unshift)
         return registros[0];
     } catch (error) {
-        console.error('Error al obtener último registro:', error);
         return null;
     }
 }
@@ -891,14 +871,12 @@ export async function agregarRegistroAEjercicio(entrenoId, ejercicioId, nuevoReg
                     registros: registros
                 });
             } catch (error) {
-                console.error('Error al sincronizar registro con la biblioteca:', error);
                 // No lanzar error - permitir que continúe aunque falle la sincronización
             }
         }
         
         return true;
     } catch (error) {
-        console.error('Error al agregar registro:', error);
         throw error;
     }
 }
@@ -934,14 +912,12 @@ export async function eliminarRegistroDeEjercicio(entrenoId, ejercicioId, regist
                     registros: registros
                 });
             } catch (error) {
-                console.error('Error al sincronizar eliminación con la biblioteca:', error);
                 // No lanzar error - permitir que continúe aunque falle la sincronización
             }
         }
         
         return true;
     } catch (error) {
-        console.error('Error al eliminar registro:', error);
         throw error;
     }
 }
@@ -999,14 +975,12 @@ export async function actualizarRegistroEnEjercicio(entrenoId, ejercicioId, regi
                     registros: registros
                 });
             } catch (error) {
-                console.error('Error al sincronizar actualización con la biblioteca:', error);
                 // No lanzar error - permitir que continúe aunque falle la sincronización
             }
         }
         
         return true;
     } catch (error) {
-        console.error('Error al actualizar registro:', error);
         throw error;
     }
 }
@@ -1042,7 +1016,6 @@ export async function agregarCategoria(nombreCategoria) {
         
         return docRef.id;
     } catch (error) {
-        console.error('Error al agregar categoría:', error);
         throw error;
     }
 }
@@ -1069,7 +1042,6 @@ export async function obtenerCategorias() {
         
         return categorias;
     } catch (error) {
-        console.error('Error al obtener categorías:', error);
         throw error;
     }
 }
@@ -1084,7 +1056,6 @@ export async function editarCategoria(id, nuevoNombre) {
             nombre: nuevoNombre.trim()
         });
     } catch (error) {
-        console.error('Error al editar categoría:', error);
         throw error;
     }
 }
@@ -1117,7 +1088,6 @@ export async function eliminarCategoria(id) {
         const categoriaRef = doc(db, 'categoriasMusculares', id);
         await deleteDoc(categoriaRef);
     } catch (error) {
-        console.error('Error al eliminar categoría:', error);
         throw error;
     }
 }
@@ -1143,7 +1113,6 @@ async function subirImagenEjercicioCategoriaAStorage(categoriaId, ejercicioId, a
         
         return downloadURL;
     } catch (error) {
-        console.error('Error al subir imagen de ejercicio de categoría a Storage:', error);
         throw error;
     }
 }
@@ -1174,7 +1143,6 @@ export async function agregarEjercicioACategoria(categoriaId, ejercicioData) {
         
         return docRef.id;
     } catch (error) {
-        console.error('Error al agregar ejercicio a la categoría:', error);
         throw error;
     }
 }
@@ -1205,7 +1173,6 @@ export async function obtenerEjerciciosDeCategoria(categoriaId) {
         
         return ejercicios;
     } catch (error) {
-        console.error('Error al obtener ejercicios de la categoría:', error);
         throw error;
     }
 }
@@ -1243,7 +1210,6 @@ export async function obtenerTodosLosEjerciciosDeBiblioteca() {
                 return null;
             } catch (error) {
                 // Si una categoría falla, solo loguear el warning y continuar
-                console.warn(`⚠️ Error al cargar ejercicios de la categoría "${cat.nombre}":`, error);
                 return null; // Devuelve null, no rompe todo
             }
         });
@@ -1255,7 +1221,6 @@ export async function obtenerTodosLosEjerciciosDeBiblioteca() {
         return resultados.filter(item => item !== null);
     } catch (error) {
         // Error fatal: siempre devolver array vacío, nunca lanzar error
-        console.error('❌ Error fatal cargando biblioteca:', error);
         return [];
     }
 }
@@ -1299,7 +1264,6 @@ export async function editarEjercicioDeCategoria(categoriaId, ejercicioId, ejerc
             imagenUrl: imagenUrl
         });
     } catch (error) {
-        console.error('Error al editar ejercicio de categoría:', error);
         throw error;
     }
 }
@@ -1326,9 +1290,7 @@ export async function eliminarEjercicioDeCategoria(categoriaId, ejercicioId) {
             } catch (error) {
                 // Si la imagen no se encuentra, no es un error fatal
                 if (error.code !== 'storage/object-not-found') {
-                    console.warn('Error al eliminar imagen de Storage (pero el ejercicio se eliminará):', error);
                 } else {
-                    console.warn('La imagen no se encontró en Storage, pero el ejercicio se eliminará.');
                 }
             }
         }
@@ -1336,7 +1298,6 @@ export async function eliminarEjercicioDeCategoria(categoriaId, ejercicioId) {
         // Eliminar el documento de Firestore
         await deleteDoc(ejercicioRef);
     } catch (error) {
-        console.error('Error al eliminar ejercicio de categoría:', error);
         throw error;
     }
 }
@@ -1357,7 +1318,6 @@ export async function guardarPerfil(datos) {
         
         return true;
     } catch (error) {
-        console.error('Error al guardar perfil:', error);
         throw error;
     }
 }
@@ -1380,7 +1340,6 @@ export async function obtenerPerfil() {
             };
         }
     } catch (error) {
-        console.error('Error al obtener perfil:', error);
         throw error;
     }
 }
@@ -1431,7 +1390,6 @@ export async function guardarMedicion(datos) {
         
         return true;
     } catch (error) {
-        console.error('Error al guardar medición:', error);
         throw error;
     }
 }
@@ -1453,7 +1411,6 @@ export async function obtenerHistorialCorporal() {
         
         return historial;
     } catch (error) {
-        console.error('Error al obtener historial corporal:', error);
         throw error;
     }
 }
@@ -1487,7 +1444,6 @@ export async function actualizarMedicion(id, datos) {
         
         return true;
     } catch (error) {
-        console.error('Error al actualizar medición:', error);
         throw error;
     }
 }
@@ -1500,7 +1456,6 @@ export async function eliminarMedicion(id) {
         
         return true;
     } catch (error) {
-        console.error('Error al eliminar medición:', error);
         throw error;
     }
 }
@@ -1520,7 +1475,6 @@ export async function borrarTodoHistorialCorporal() {
         
         return true;
     } catch (error) {
-        console.error('Error al borrar historial corporal:', error);
         throw error;
     }
 }
@@ -1548,7 +1502,6 @@ async function subirImagenBibliotecaAStorage(ejercicioId, archivo) {
         
         return downloadURL;
     } catch (error) {
-        console.error('Error al subir imagen de biblioteca a Storage:', error);
         throw error;
     }
 }
@@ -1579,7 +1532,6 @@ export async function agregarEjercicioABiblioteca(ejercicioData) {
         
         return docRef.id;
     } catch (error) {
-        console.error('Error al agregar ejercicio a la biblioteca:', error);
         throw error;
     }
 }
@@ -1608,7 +1560,6 @@ export async function obtenerEjerciciosBiblioteca() {
         
         return ejercicios;
     } catch (error) {
-        console.error('Error al obtener ejercicios de la biblioteca:', error);
         throw error;
     }
 }
@@ -1647,7 +1598,6 @@ export async function editarEjercicioBiblioteca(id, data) {
         // Actualizar el documento
         await updateDoc(ejercicioRef, datosParaActualizar);
     } catch (error) {
-        console.error('Error al editar ejercicio de la biblioteca:', error);
         throw error;
     }
 }
@@ -1689,7 +1639,6 @@ export async function eliminarEjercicioBiblioteca(id) {
         // Paso 3: Finalmente, eliminar el documento de la biblioteca
         await deleteDoc(ejercicioRef);
     } catch (error) {
-        console.error('Error al eliminar ejercicio de la biblioteca:', error);
         throw error;
     }
 }
@@ -1722,7 +1671,6 @@ export async function obtenerDiasEntrenados() {
         
         return dias;
     } catch (error) {
-        console.error('Error al obtener días entrenados:', error);
         throw error;
     }
 }

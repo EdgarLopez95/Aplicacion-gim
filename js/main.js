@@ -71,7 +71,9 @@ import {
     renderizarPerfilView,
     renderizarModalSeleccionEjercicio,
     renderizarCalendarioView,
-    getCalendarioView
+    getCalendarioView,
+    renderizarTablaHistorial,
+    formatearFechaVisual
 } from './ui.js';
 
 // Referencia al botón cancelar (está en el HTML del modal)
@@ -149,7 +151,6 @@ async function manejarClicAnadirEjercicio() {
     } catch (error) {
         // Este catch nunca debería ejecutarse ahora (la función siempre devuelve array)
         // Pero lo mantenemos por seguridad
-        console.error('Error inesperado al cargar ejercicios de la biblioteca:', error);
         
         // Mostrar mensaje en el modal
         const modalContent = modalSeleccion?.querySelector('.modal-content');
@@ -325,7 +326,6 @@ function configurarEventListenersModalSeleccion() {
                 // Actualizar barra de progreso
                 actualizarBarraProgreso();
             } catch (error) {
-                console.error('Error al agregar ejercicio:', error);
                 alert('Error al agregar el ejercicio al entreno');
             }
         });
@@ -363,7 +363,6 @@ async function manejarSubmitFormulario(e) {
                 try {
                     imagenBase64 = await convertirImagenABase64(archivoImagen);
                 } catch (error) {
-                    console.error('Error al procesar la imagen:', error);
                     alert(error.message || 'Error al procesar la imagen. Por favor, intenta de nuevo.');
                     return;
                 }
@@ -400,7 +399,6 @@ async function manejarSubmitFormulario(e) {
             try {
                 imagenBase64 = await convertirImagenABase64(archivoImagen);
             } catch (error) {
-                console.error('Error al procesar la imagen:', error);
                 alert(error.message || 'Error al procesar la imagen. Por favor, intenta de nuevo.');
                 return;
             }
@@ -431,7 +429,6 @@ async function manejarSubmitFormulario(e) {
         
     } catch (error) {
         // 3. Manejar el error
-        console.error('Error al guardar:', error);
     } finally {
         // 4. Quitar estado de carga (SIEMPRE se ejecuta)
         if (boton) {
@@ -475,7 +472,6 @@ async function mostrarVistaEntreno(entreno) {
         if (listaContainer) {
             listaContainer.innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 20px;">Error al cargar ejercicios.</p>';
         }
-        console.error('Error al cargar ejercicios:', error);
     }
 }
 
@@ -499,7 +495,6 @@ async function mostrarVistaBiblioteca() {
         if (listaContainer) {
             listaContainer.innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 20px;">Error al cargar categorías.</p>';
         }
-        console.error('Error al cargar categorías:', error);
     }
 }
 
@@ -546,12 +541,12 @@ async function mostrarVistaPerfil() {
         
         // 3. Obtener historial corporal
         const historial = await obtenerHistorialCorporal();
-        historialCorporalGlobal = historial; // Guardar para filtros
+        historialCorporalGlobal = historial;
         
         // 4. Obtener último registro para el resumen
         const ultimaMedicion = historial.length > 0 ? historial[historial.length - 1] : null;
         
-        // 5. Renderizar la vista con los datos
+        // 5. Renderizar la vista con historial completo
         renderizarPerfilView({ 
             ...datosPerfil, 
             imc,
@@ -566,9 +561,13 @@ async function mostrarVistaPerfil() {
         configurarEventListenersPerfil();
         
         // 8. Renderizar gráfica con filtro actual
-        renderizarGraficaComposicion(historial, filtroGraficaActual);
+        try {
+            renderizarGraficaComposicion(historial, filtroGraficaActual);
+        } catch (e) {
+            // Error no bloqueante en gráfica
+        }
+        
     } catch (error) {
-        console.error('Error al cargar perfil:', error);
         // Renderizar vista vacía en caso de error
         renderizarPerfilView({ 
             nombre: '', 
@@ -576,12 +575,12 @@ async function mostrarVistaPerfil() {
             altura: null, 
             edad: null, 
             imc: { valor: null, categoria: 'No disponible' },
-            ultimaMedicion: null
+            ultimaMedicion: null,
+            historial: []
         });
         showView(document.getElementById('perfil-view'));
         configurarEventListenersPerfil();
         historialCorporalGlobal = [];
-        renderizarGraficaComposicion([], filtroGraficaActual);
     }
 }
 
@@ -608,7 +607,6 @@ async function mostrarVistaCalendario() {
         // 5. Mostrar la vista
         showView(getCalendarioView());
     } catch (error) {
-        console.error('Error al cargar vista de calendario:', error);
         alert('Error al cargar el calendario. Por favor, intenta de nuevo.');
     }
 }
@@ -643,7 +641,6 @@ async function configurarNavegacionCalendario(diasEntrenados, racha) {
 function renderizarGraficaComposicion(historial, filtro = 'peso') {
     const canvas = document.getElementById('progressChart');
     if (!canvas) {
-        console.error('Canvas de gráfica no encontrado');
         return;
     }
     
@@ -754,7 +751,6 @@ function prepararDatosGrafica(historial, filtro) {
             const fecha = new Date(m.fecha);
             // Verificar que la fecha sea válida
             if (isNaN(fecha.getTime())) {
-                console.warn('Fecha inválida:', m.fecha);
                 return '';
             }
             // Formato simple: DD/MM
@@ -762,7 +758,6 @@ function prepararDatosGrafica(historial, filtro) {
             const mes = String(fecha.getMonth() + 1).padStart(2, '0');
             return `${dia}/${mes}`;
         } catch (error) {
-            console.error('Error al formatear fecha:', error, m.fecha);
             return '';
         }
     });
@@ -963,12 +958,18 @@ function configurarEventListenersPerfil() {
                 await mostrarVistaPerfil();
                 alert('Historial borrado correctamente');
             } catch (error) {
-                console.error('Error al borrar historial:', error);
                 alert('Error al borrar el historial. Por favor, intenta de nuevo.');
             }
         });
     }
     
+    
+    // Configurar event listeners de mediciones
+    configurarEventListenersMediciones();
+}
+
+// Función para configurar event listeners de las tarjetas de mediciones
+function configurarEventListenersMediciones() {
     // Tarjetas de historial expandibles
     const historialCards = document.querySelectorAll('.historial-card');
     historialCards.forEach(card => {
@@ -1026,7 +1027,6 @@ function configurarEventListenersPerfil() {
                 
                 alert('Medición eliminada correctamente');
             } catch (error) {
-                console.error('Error al eliminar medición:', error);
                 alert('Error al eliminar la medición. Por favor, intenta de nuevo.');
             }
         });
@@ -1084,7 +1084,6 @@ async function manejarGuardarPerfil() {
         // Cerrar modal
         ocultarModalPerfil();
     } catch (error) {
-        console.error('Error al guardar perfil:', error);
         alert('Error al guardar el perfil. Por favor, intenta de nuevo.');
     } finally {
         if (boton) {
@@ -1109,7 +1108,6 @@ async function mostrarModalPerfil() {
             form.querySelector('#edad-perfil').value = datosPerfil.edad || '';
         }
     } catch (error) {
-        console.error('Error al cargar datos del perfil:', error);
         // Si falla, intentar cargar desde el DOM
         const datosPerfil = document.querySelector('.perfil-data');
         if (datosPerfil) {
@@ -1238,7 +1236,6 @@ async function mostrarModalEditarMedicion(id) {
             if (btn) btn.style.display = 'none';
         });
     } catch (error) {
-        console.error('Error al cargar medición para editar:', error);
         alert('Error al cargar la medición. Por favor, intenta de nuevo.');
     }
 }
@@ -1334,7 +1331,6 @@ async function manejarGuardarMedicion() {
         // Limpiar formulario
         form.reset();
     } catch (error) {
-        console.error('Error al guardar medición:', error);
         alert('Error al guardar la medición. Por favor, intenta de nuevo.');
     } finally {
         // Ocultar spinner global
@@ -1495,7 +1491,6 @@ async function manejarSubmitCategoria(e) {
         ocultarModalCategoria();
         
     } catch (error) {
-        console.error('Error al guardar categoría:', error);
         alert('Error al guardar la categoría. Por favor, intenta de nuevo.');
     } finally {
         // 7. Quitar estado de carga
@@ -1512,7 +1507,6 @@ async function editarCategoriaHandler(categoriaId) {
         const categoria = categorias.find(c => c.id === categoriaId);
         
         if (!categoria) {
-            console.error('Categoría no encontrada');
             return;
         }
         
@@ -1535,7 +1529,6 @@ async function editarCategoriaHandler(categoriaId) {
         mostrarModalCategoria();
         
     } catch (error) {
-        console.error('Error al cargar categoría para editar:', error);
     }
 }
 
@@ -1562,7 +1555,6 @@ async function eliminarCategoriaHandler(categoriaId, botonElement) {
         renderizarListaCategorias(categorias, editarCategoriaHandler, eliminarCategoriaHandler, mostrarVistaCategoriaEjercicios);
     } catch (error) {
         // 3. Manejar el error
-        console.error('Error al eliminar la categoría:', error);
         alert('Error al eliminar la categoría. Por favor, intenta de nuevo.');
     } finally {
         // 4. Quitar estado de carga (SIEMPRE se ejecuta)
@@ -1600,7 +1592,6 @@ async function mostrarVistaCategoriaEjercicios(categoriaId, categoriaNombre) {
         if (listaContainer) {
             listaContainer.innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 20px;">Error al cargar ejercicios de la categoría.</p>';
         }
-        console.error('Error al cargar ejercicios de la categoría:', error);
     }
 }
 
@@ -1687,7 +1678,6 @@ async function manejarSubmitEjercicioCategoria(e) {
     e.preventDefault();
     
     if (!categoriaActual) {
-        console.error('No hay categoría actual');
         return;
     }
     
@@ -1735,7 +1725,6 @@ async function manejarSubmitEjercicioCategoria(e) {
         currentlyEditingEjercicioCategoriaId = null;
         
     } catch (error) {
-        console.error('Error al guardar ejercicio de categoría:', error);
         alert('Error al guardar el ejercicio. Por favor, intenta de nuevo.');
     } finally {
         // 6. Quitar estado de carga
@@ -1753,7 +1742,6 @@ async function eliminarEjercicioCategoriaHandler(ejercicioId, botonElement) {
     }
     
     if (!categoriaActual) {
-        console.error('No hay categoría actual');
         return;
     }
     
@@ -1772,7 +1760,6 @@ async function eliminarEjercicioCategoriaHandler(ejercicioId, botonElement) {
         renderizarListaEjerciciosCategoria(ejercicios, editarEjercicioCategoriaHandler, eliminarEjercicioCategoriaHandler);
     } catch (error) {
         // 3. Manejar el error
-        console.error('Error al eliminar el ejercicio de categoría:', error);
         alert('Error al eliminar el ejercicio. Por favor, intenta de nuevo.');
     } finally {
         // 4. Quitar estado de carga (SIEMPRE se ejecuta)
@@ -1785,7 +1772,6 @@ async function eliminarEjercicioCategoriaHandler(ejercicioId, botonElement) {
 // Función para editar un ejercicio de categoría
 async function editarEjercicioCategoriaHandler(ejercicioId) {
     if (!categoriaActual) {
-        console.error('No hay categoría actual');
         return;
     }
     
@@ -1793,7 +1779,6 @@ async function editarEjercicioCategoriaHandler(ejercicioId) {
     const ejercicio = ejercicios.find(e => e.id === ejercicioId);
     
     if (!ejercicio) {
-        console.error('Ejercicio no encontrado');
         return;
     }
     
@@ -1818,7 +1803,6 @@ async function editarEjercicioBibliotecaHandler(ejercicioId) {
         const ejercicio = ejercicios.find(e => e.id === ejercicioId);
         
         if (!ejercicio) {
-            console.error('Ejercicio no encontrado');
             return;
         }
         
@@ -1850,7 +1834,6 @@ async function editarEjercicioBibliotecaHandler(ejercicioId) {
         mostrarModalBiblioteca();
         
     } catch (error) {
-        console.error('Error al cargar ejercicio para editar:', error);
     }
 }
 
@@ -1882,13 +1865,11 @@ async function eliminarEjercicioBibliotecaHandler(ejercicioId, botonElement) {
                 // Recargar el entreno actual para reflejar los cambios
                 await mostrarVistaEntreno(entrenoActual);
             } catch (error) {
-                console.error('Error al refrescar vista de entreno:', error);
                 // No mostrar error al usuario, solo loguear
             }
         }
     } catch (error) {
         // 3. Manejar el error
-        console.error('Error al eliminar el ejercicio de la biblioteca:', error);
         alert('Error al eliminar el ejercicio. Por favor, intenta de nuevo.');
     } finally {
         // 4. Quitar estado de carga (SIEMPRE se ejecuta)
@@ -1901,14 +1882,12 @@ async function eliminarEjercicioBibliotecaHandler(ejercicioId, botonElement) {
 // Función para mostrar la vista de ejercicio (registro de progreso)
 async function mostrarVistaEjercicio(ejercicioId) {
     if (!entrenoActual) {
-        console.error('No hay entreno actual');
         return;
     }
     
     // Obtener el ejercicio
     const ejercicio = await obtenerEjercicio(entrenoActual.id, ejercicioId);
     if (!ejercicio) {
-        console.error('Ejercicio no encontrado');
         return;
     }
     
@@ -1993,7 +1972,6 @@ async function manejarSubmitRegistro(e) {
     e.preventDefault();
     
     if (!entrenoActual || !ejercicioActual) {
-        console.error('No hay entreno o ejercicio actual');
         return;
     }
     
@@ -2069,7 +2047,6 @@ async function manejarSubmitRegistro(e) {
         
     } catch (error) {
         // 3. Manejar el error
-        console.error('Error al guardar el registro:', error);
     } finally {
         // 4. Quitar estado de carga (SIEMPRE se ejecuta)
         if (boton) {
@@ -2081,7 +2058,6 @@ async function manejarSubmitRegistro(e) {
 // Función para editar un registro
 function editarRegistro(registroId) {
     if (!entrenoActual || !ejercicioActual) {
-        console.error('No hay entreno o ejercicio actual');
         return;
     }
     
@@ -2090,7 +2066,6 @@ function editarRegistro(registroId) {
     const registro = registros.find(r => r.id === registroId);
     
     if (!registro) {
-        console.error('Registro no encontrado');
         return;
     }
     
@@ -2100,7 +2075,6 @@ function editarRegistro(registroId) {
     // Poblar el formulario con los datos del registro
     const form = document.getElementById('form-nuevo-registro');
     if (!form) {
-        console.error('Formulario no encontrado');
         return;
     }
     
@@ -2158,7 +2132,6 @@ function editarRegistro(registroId) {
 // Función para eliminar un registro
 async function eliminarRegistro(registroId, botonElement) {
     if (!entrenoActual || !ejercicioActual) {
-        console.error('No hay entreno o ejercicio actual');
         return;
     }
     
@@ -2205,7 +2178,6 @@ async function eliminarRegistro(registroId, botonElement) {
         renderizarListaRegistros(registros, editarRegistro, eliminarRegistro);
     } catch (error) {
         // 3. Manejar el error
-        console.error('Error al eliminar el registro:', error);
     } finally {
         // 4. Quitar estado de carga (SIEMPRE se ejecuta)
         if (boton) {
@@ -2239,7 +2211,6 @@ async function eliminarEjercicio(ejercicioId, botonElement) {
         actualizarBarraProgreso();
     } catch (error) {
         // 3. Manejar el error
-        console.error('Error al eliminar el ejercicio:', error);
     } finally {
         // 4. Quitar estado de carga (SIEMPRE se ejecuta)
         if (boton) {
@@ -2308,7 +2279,6 @@ async function toggleCompletado(entrenoId, ejercicioId) {
         // Buscar el ejercicio en la lista local
         const ejercicio = ejerciciosParaUsar.find(e => e.id === ejercicioId);
         if (!ejercicio) {
-            console.error('Ejercicio no encontrado en la lista local');
             return;
         }
         
@@ -2351,7 +2321,6 @@ async function toggleCompletado(entrenoId, ejercicioId) {
         // Paso 4: Enviar a Firebase (sin await bloqueante)
         toggleCompletadoEjercicio(entrenoId, ejercicioId, estado, entrenoNombre, totalEjercicios).catch(error => {
             // Si Firebase falla, revertir el cambio local
-            console.error('Error al toggle completado en Firebase:', error);
             
             // Revertir el cambio (restaurar el valor original)
             ejercicio.fechaCompletado = fechaCompletadoActual;
@@ -2381,7 +2350,6 @@ async function toggleCompletado(entrenoId, ejercicioId) {
             }
         });
     } catch (error) {
-        console.error('Error al toggle completado:', error);
         if (typeof showInfoModal === 'function') {
             showInfoModal('Error', 'Error al actualizar el estado. Por favor, intenta de nuevo.');
         } else {
@@ -2396,7 +2364,6 @@ async function sustituirEjercicio(ejercicioId) {
     const ejercicio = ejercicios.find(e => e.id === ejercicioId);
     
     if (!ejercicio) {
-        console.error('Ejercicio no encontrado');
         return;
     }
     
@@ -2483,7 +2450,6 @@ async function sustituirEjercicio(ejercicioId) {
     } catch (error) {
         // Este catch nunca debería ejecutarse ahora (la función siempre devuelve array)
         // Pero lo mantenemos por seguridad
-        console.error('Error inesperado al cargar ejercicios de la biblioteca:', error);
         // Mostrar error en el modal
         const modalContent = modalSeleccion?.querySelector('.modal-content');
         if (modalContent) {
@@ -2616,7 +2582,6 @@ function configurarEventListenersModalSeleccionSustitucion(ejercicioIdOriginal) 
                 // Actualizar barra de progreso
                 actualizarBarraProgreso();
             } catch (error) {
-                console.error('Error al sustituir ejercicio:', error);
                 tarjeta.classList.remove('is-loading');
                 // Cerrar el modal de selección antes de mostrar el modal de información
                 const modalSeleccion = document.getElementById('modal-seleccion-ejercicio');
@@ -2781,15 +2746,12 @@ async function actualizarNombresEntrenos() {
             if (nuevoNombre && nuevoNombre !== nombreActual) {
                 await actualizarNombreEntreno(entreno.id, nuevoNombre);
                 actualizados++;
-                console.log(`Actualizado: "${nombreActual}" → "${nuevoNombre}"`);
             }
         }
         
         if (actualizados > 0) {
-            console.log(`✅ Se actualizaron ${actualizados} nombres de entrenos`);
         }
     } catch (error) {
-        console.error('Error al actualizar nombres de entrenos:', error);
     }
 }
 
@@ -2818,7 +2780,6 @@ async function cachearImagenesManualmente(entrenos) {
             urlsParaCachear.push(profilePic.src);
         }
         
-        console.log('🖼️ Cacheando', urlsParaCachear.length, 'imágenes usando no-cors...');
         
         // Cachear cada imagen usando mode: 'no-cors'
         // Esto crea respuestas "opaque" que SÍ se pueden cachear
@@ -2827,7 +2788,6 @@ async function cachearImagenesManualmente(entrenos) {
                 // Verificar si ya está en caché
                 const cached = await cache.match(url);
                 if (cached) {
-                    console.log('✅ Imagen ya está en caché:', url);
                     return;
                 }
                 
@@ -2841,25 +2801,19 @@ async function cachearImagenesManualmente(entrenos) {
                 // Las respuestas "opaque" siempre tienen status 0, pero se pueden cachear
                 if (response) {
                     await cache.put(url, response);
-                    console.log('💾 Imagen cacheada exitosamente (opaque response):', url);
                     
                     // Verificar que se guardó
                     const verificacion = await cache.match(url);
                     if (verificacion) {
-                        console.log('✅ Verificación - Imagen confirmada en caché:', url);
                     }
                 } else {
-                    console.warn('⚠️ No se pudo obtener respuesta para:', url);
                 }
             } catch (error) {
-                console.warn('⚠️ Error al cachear imagen:', url, error);
             }
         });
         
         await Promise.allSettled(promesasCache);
-        console.log('✅ Proceso de cacheo de imágenes completado');
     } catch (error) {
-        console.error('❌ Error al cachear imágenes manualmente:', error);
     }
 }
 
@@ -2918,7 +2872,6 @@ async function initApp() {
                 e.preventDefault(); // Prevenir comportamientos raros
                 e.stopPropagation(); // Evitar que el evento se propague
                 
-                console.log('Clic en volver detectado');
                 
                 // 2. Detectar qué vista está activa usando display en lugar de .active
                 const entrenoView = document.getElementById('entreno-view');
@@ -2934,18 +2887,15 @@ async function initApp() {
                 
                 // Lógica de navegación
                 if (isViewVisible(entrenoView)) {
-                    console.log('Navegando desde entreno-view a dashboard');
                     // Cargar y mostrar el dashboard
                     cargarEntrenos().then(entrenos => {
                         renderizarDashboardView(entrenos, mostrarVistaEntreno);
                         showView(getDashboardView());
                     }).catch(error => {
-                        console.error('Error al cargar entrenos:', error);
                         showView(getDashboardView());
                     });
                 } 
                 else if (isViewVisible(ejercicioView)) {
-                    console.log('Navegando desde ejercicio-view a entreno');
                     // Volver al entreno actual
                     if (entrenoActual) {
                         mostrarVistaEntreno(entrenoActual);
@@ -2955,18 +2905,12 @@ async function initApp() {
                             renderizarDashboardView(entrenos, mostrarVistaEntreno);
                             showView(getDashboardView());
                         }).catch(error => {
-                            console.error('Error al cargar entrenos:', error);
                             showView(getDashboardView());
                         });
                     }
                 } 
                 else if (isViewVisible(categoriaEjerciciosView)) {
-                    console.log('Navegando desde categoria-ejercicios-view a biblioteca');
                     mostrarVistaBiblioteca(); // Volver a la lista de categorías
-                } else {
-                    console.log('Vista activa no detectada. Entreno:', isViewVisible(entrenoView), 
-                                'Ejercicio:', isViewVisible(ejercicioView), 
-                                'Categoria:', isViewVisible(categoriaEjerciciosView));
                 }
             }
         });
@@ -3006,17 +2950,23 @@ async function initApp() {
         
         // Registrar el Service Worker
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('./sw.js')
+            navigator.serviceWorker.register('./sw.js', {
+                updateViaCache: 'none' // Forzar verificación de actualizaciones en cada carga
+            })
                 .then(registration => {
-                    console.log('✅ Service Worker registrado correctamente:', registration.scope);
+                    
+                    // Forzar actualización periódica del Service Worker
+                    setInterval(() => {
+                        registration.update();
+                    }, 60000); // Verificar actualizaciones cada minuto
                     
                     // Verificar si hay una actualización disponible
                     registration.addEventListener('updatefound', () => {
                         const newWorker = registration.installing;
-                        console.log('🔄 Nueva versión del Service Worker encontrada');
                         newWorker.addEventListener('statechange', () => {
                             if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                console.log('🔄 Nueva versión lista. Recarga la página para actualizar.');
+                                // Opcional: recargar automáticamente cuando el nuevo SW esté listo
+                                // window.location.reload();
                             }
                         });
                     });
@@ -3037,13 +2987,9 @@ async function initApp() {
                     }
                 })
                 .catch(error => {
-                    console.error('❌ Error al registrar el Service Worker:', error);
                 });
-        } else {
-            console.warn('⚠️ Service Worker no soportado en este navegador');
         }
     } catch (error) {
-        console.error('Error al inicializar la aplicación:', error);
     } finally {
         // Ocultar el loader global
         const loader = document.getElementById('global-loader');

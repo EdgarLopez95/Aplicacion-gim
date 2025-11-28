@@ -59,7 +59,6 @@ enableIndexedDbPersistence(db)
 
     .then(() => {
 
-        console.log('✅ Persistencia offline activada. La app funcionará sin conexión.');
 
     })
 
@@ -69,17 +68,14 @@ enableIndexedDbPersistence(db)
 
             // Múltiples pestañas abiertas, solo una puede tener persistencia habilitada
 
-            console.warn('⚠️ La persistencia falló: Probablemente múltiples pestañas abiertas. Solo una pestaña puede tener persistencia activa.');
 
         } else if (err.code == 'unimplemented') {
 
             // El navegador no soporta persistencia (muy raro en navegadores modernos)
 
-            console.warn('⚠️ El navegador no soporta persistencia offline.');
 
         } else {
 
-            console.error('❌ Error al activar persistencia offline:', err);
 
         }
 

@@ -3,7 +3,7 @@
 import { obtenerUltimoRegistro } from './storage.js';
 
 // Función auxiliar para formatear fecha visual sin problemas de timezone
-function formatearFechaVisual(fechaString) {
+export function formatearFechaVisual(fechaString) {
     if (!fechaString) return '--';
     
     // Asume formato YYYY-MM-DD
@@ -312,7 +312,6 @@ export function renderizarListaEjercicios(ejercicios, onEditarClick, onEliminarC
     
     const listaContainer = document.getElementById('lista-ejercicios-container');
     if (!listaContainer) {
-        console.error('lista-ejercicios-container no encontrado');
         return;
     }
     
@@ -494,7 +493,6 @@ export function renderizarBibliotecaView() {
     
     const bibliotecaView = document.getElementById('biblioteca-view');
     if (!bibliotecaView) {
-        console.error('biblioteca-view no encontrado');
         return;
     }
     
@@ -537,7 +535,6 @@ export function renderizarCategoriaEjerciciosView(categoriaNombre) {
     
     const categoriaEjerciciosView = document.getElementById('categoria-ejercicios-view');
     if (!categoriaEjerciciosView) {
-        console.error('categoria-ejercicios-view no encontrado');
         return;
     }
     
@@ -586,7 +583,6 @@ export function renderizarListaEjerciciosCategoria(ejercicios, onEditarClick, on
     
     const listaContainer = document.getElementById('lista-ejercicios-categoria-container');
     if (!listaContainer) {
-        console.error('lista-ejercicios-categoria-container no encontrado');
         return;
     }
     
@@ -703,7 +699,6 @@ export function renderizarListaCategorias(categorias, onEditarClick, onEliminarC
     
     const listaContainer = document.getElementById('lista-categorias');
     if (!listaContainer) {
-        console.error('lista-categorias no encontrado');
         return;
     }
     
@@ -797,7 +792,6 @@ export function renderizarListaBiblioteca(ejercicios, onEditarClick, onEliminarC
     
     const listaContainer = document.getElementById('lista-biblioteca-container');
     if (!listaContainer) {
-        console.error('lista-biblioteca-container no encontrado');
         return;
     }
     
@@ -926,64 +920,6 @@ export function renderizarEjercicioView(ejercicio, registros, onEditarRegistroCl
     };
     const hoy = obtenerFechaLocal();
     
-    // Función auxiliar para formatear una serie
-    const formatearSerie = (serie) => {
-        if (serie && serie.peso && serie.repeticiones) {
-            return `${serie.peso}kg x ${serie.repeticiones}`;
-        }
-        return '-';
-    };
-    
-    // Generar HTML de la tabla de registros
-    const registrosHTML = registros && registros.length > 0
-        ? `
-            <div class="registros-table-container">
-                <table class="registros-table">
-                    <thead>
-                        <tr>
-                            <th>Fecha</th>
-                            <th>Serie 1</th>
-                            <th>Serie 2</th>
-                            <th>Serie 3</th>
-                            <th>Serie 4</th>
-                            <th>Notas</th>
-                            <th>Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${registros.map(registro => {
-                            const series = registro.series || [];
-                            return `
-                                <tr>
-                                    <td>${formatearFechaVisual(registro.fecha)}</td>
-                                    <td class="serie-cell">${formatearSerie(series[0])}</td>
-                                    <td class="serie-cell">${formatearSerie(series[1])}</td>
-                                    <td class="serie-cell">${formatearSerie(series[2])}</td>
-                                    <td class="serie-cell">${formatearSerie(series[3])}</td>
-                                    <td class="notas-cell">${registro.notas || '-'}</td>
-                                    <td class="acciones-cell">
-                                        <button class="btn-editar-registro" data-registro-id="${registro.id}" title="Editar">
-                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                                            </svg>
-                                        </button>
-                                        <button class="btn-eliminar-registro" data-registro-id="${registro.id}" title="Eliminar">
-                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                                <polyline points="3 6 5 6 21 6"></polyline>
-                                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                                            </svg>
-                                        </button>
-                                    </td>
-                                </tr>
-                            `;
-                        }).join('')}
-                    </tbody>
-                </table>
-            </div>
-        `
-        : '<p style="color: var(--text-secondary); text-align: center; padding: 20px;">No hay registros aún</p>';
-    
     const ejercicioHTML = `
         ${renderizarBotonVolver()}
         <h2 id="ejercicio-titulo">${ejercicio.nombre}</h2>
@@ -993,7 +929,7 @@ export function renderizarEjercicioView(ejercicio, registros, onEditarRegistroCl
         <div class="registros-section">
             <h3>Historial de Registros</h3>
             <div id="lista-registros" class="lista-registros">
-                ${registrosHTML}
+                <!-- Los registros se renderizarán aquí usando renderizarListaRegistros -->
             </div>
         </div>
         
@@ -1053,30 +989,9 @@ export function renderizarEjercicioView(ejercicio, registros, onEditarRegistroCl
     // Actualizar referencias después de renderizar
     actualizarReferenciasDOM();
     
-    // Agregar event listeners a los botones de editar y eliminar registro
-    if (registros && registros.length > 0) {
-        const botonesEditarRegistro = ejercicioView.querySelectorAll('.btn-editar-registro');
-        botonesEditarRegistro.forEach(boton => {
-            boton.addEventListener('click', function(e) {
-                e.stopPropagation();
-                const registroId = parseInt(this.dataset.registroId);
-                if (onEditarRegistroClick) {
-                    onEditarRegistroClick(registroId);
-                }
-            });
-        });
-        
-        const botonesEliminarRegistro = ejercicioView.querySelectorAll('.btn-eliminar-registro');
-        botonesEliminarRegistro.forEach(boton => {
-            boton.addEventListener('click', function(e) {
-                e.stopPropagation();
-                const registroId = parseInt(this.dataset.registroId);
-                if (onEliminarRegistroClick) {
-                    onEliminarRegistroClick(registroId, this); // Pasar el botón como segundo parámetro
-                }
-            });
-        });
-    }
+    // Renderizar los registros usando la función que genera las tarjetas bonitas
+    // Esto asegura que todos los registros (antiguos y nuevos) se vean igual
+    renderizarListaRegistros(registros, onEditarRegistroClick, onEliminarRegistroClick);
 }
 
 // Función para renderizar solo la lista de registros (actualizar después de agregar)
@@ -1085,7 +1000,6 @@ export function renderizarListaRegistros(registros, onEditarRegistroClick, onEli
     
     const listaRegistros = document.getElementById('lista-registros');
     if (!listaRegistros) {
-        console.error('lista-registros no encontrado');
         return;
     }
     
@@ -1317,7 +1231,6 @@ export async function mostrarModalRegistro(entrenoId = null, ejercicioId = null)
                 }
             }
         } catch (error) {
-            console.error('Error al obtener último registro:', error);
             // En caso de error, ocultar el contenedor
             if (ultimoRegistroInfo) {
                 ultimoRegistroInfo.style.display = 'none';
@@ -1383,7 +1296,6 @@ export function showConfirmationModal(title, message) {
         const btnNo = document.getElementById('modal-btn-no');
         
         if (!modal || !modalTitle || !modalMessage || !btnYes || !btnNo) {
-            console.error('Elementos del modal de confirmación no encontrados');
             resolve(false);
             return;
         }
@@ -1436,7 +1348,6 @@ export function showInfoModal(title, message) {
         const btnNo = document.getElementById('modal-btn-no');
         
         if (!modal || !modalTitle || !modalMessage || !btnYes || !btnNo) {
-            console.error('Elementos del modal de confirmación no encontrados');
             resolve();
             return;
         }
@@ -1573,7 +1484,6 @@ export function actualizarBreadcrumbs(links, onNavigate, container = null) {
     }
     
     if (!breadcrumbsContainer) {
-        console.error('No se encontró el contenedor de breadcrumbs');
         return;
     }
     
@@ -1616,7 +1526,7 @@ export function actualizarBreadcrumbs(links, onNavigate, container = null) {
 }
 
 // Función para renderizar la tabla de historial
-function renderizarTablaHistorial(historial) {
+export function renderizarTablaHistorial(historial, paginaActual = 1, totalPaginas = 1) {
     if (!historial || historial.length === 0) {
         return `
             <div class="historial-empty">
@@ -1626,16 +1536,8 @@ function renderizarTablaHistorial(historial) {
         `;
     }
     
-    // Ordenar por fecha descendente (más reciente primero)
-    // Usar comparación de strings YYYY-MM-DD directamente (sin Date para evitar timezone)
-    const historialOrdenado = [...historial].sort((a, b) => {
-        const fechaA = a.fecha || '';
-        const fechaB = b.fecha || '';
-        // Comparar strings directamente (YYYY-MM-DD se ordena correctamente como string)
-        return fechaB.localeCompare(fechaA);
-    });
-    
-    const tarjetas = historialOrdenado.map(medicion => {
+    // El historial ya viene ordenado y paginado desde main.js
+    const tarjetas = historial.map(medicion => {
         // Usar función auxiliar para formatear fecha sin problemas de timezone
         const fechaFormateada = formatearFechaVisual(medicion.fecha);
         
@@ -1676,13 +1578,23 @@ function renderizarTablaHistorial(historial) {
         `;
     }).join('');
     
-    return `
-        <div class="historial-container">
-            <h3 class="section-title-perfil">HISTORIAL DE REGISTROS</h3>
-            <div class="historial-list">
-                ${tarjetas}
+    // Controles de paginación (solo si hay más de una página)
+    const controlesPaginacion = totalPaginas > 1
+        ? `
+            <div class="pagination-controls">
+                <button id="btn-prev-page" class="btn-icon-small" ${paginaActual === 1 ? 'disabled' : ''}>❮</button>
+                <span class="pagination-info">Página ${paginaActual} de ${totalPaginas}</span>
+                <button id="btn-next-page" class="btn-icon-small" ${paginaActual === totalPaginas ? 'disabled' : ''}>❯</button>
             </div>
+        `
+        : '';
+    
+    // Devolver solo el contenido de la lista y los controles (el título ya existe en el contenedor)
+    return `
+        <div class="historial-list">
+            ${tarjetas}
         </div>
+        ${controlesPaginacion}
     `;
 }
 
@@ -1723,7 +1635,6 @@ export function renderizarPerfilView(datosPerfil = {}) {
     
     const perfilView = document.getElementById('perfil-view');
     if (!perfilView) {
-        console.error('perfil-view no encontrado');
         return;
     }
     
@@ -1868,7 +1779,6 @@ export function renderizarPerfilView(datosPerfil = {}) {
 export function renderizarModalSeleccionEjercicio(ejerciciosPorCategoria) {
     const modal = document.getElementById('modal-seleccion-ejercicio');
     if (!modal) {
-        console.error('modal-seleccion-ejercicio no encontrado');
         return;
     }
     
@@ -1944,7 +1854,6 @@ export function renderizarModalSeleccionEjercicio(ejerciciosPorCategoria) {
 export function renderizarCalendarioView(diasEntrenados = [], racha = 0, fechaReferencia = null) {
     const calendarioView = document.getElementById('calendario-view');
     if (!calendarioView) {
-        console.error('calendario-view no encontrado');
         return;
     }
     
