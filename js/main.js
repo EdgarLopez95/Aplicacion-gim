@@ -1016,39 +1016,6 @@ function configurarEventListenersPerfil() {
         });
     }
     
-    // Botón clonar de Edgar (temporal)
-    const btnClonarEdgar = document.getElementById('btn-clonar-edgar');
-    if (btnClonarEdgar) {
-        btnClonarEdgar.addEventListener('click', async function() {
-            const confirmar = confirm('⚠️ ¿Estás seguro de que quieres clonar la configuración de Edgar?\n\n' +
-                'Esto copiará:\n' +
-                '• Todas las categorías musculares y ejercicios de biblioteca\n' +
-                '• Todos los entrenos y ejercicios (SIN historial de registros)\n\n' +
-                '⚠️ Esto SOBREESCRIBIRÁ la configuración actual de Valentina.\n\n' +
-                '¿Continuar?');
-            if (!confirmar) return;
-            
-            // Deshabilitar el botón durante la clonación
-            btnClonarEdgar.disabled = true;
-            btnClonarEdgar.textContent = '🔄 Clonando...';
-            
-            try {
-                // Importar y ejecutar la función de clonación
-                const { clonarEdgarAValentina } = await import('./cloneProfile.js');
-                await clonarEdgarAValentina();
-                
-                // El script recarga la página automáticamente
-            } catch (error) {
-                console.error('Error al clonar configuración:', error);
-                alert('Error al clonar configuración:\n\n' + error.message);
-                
-                // Rehabilitar el botón en caso de error
-                btnClonarEdgar.disabled = false;
-                btnClonarEdgar.textContent = '👯 CLONAR DE EDGAR';
-            }
-        });
-    }
-    
     // Configurar event listeners de mediciones
     configurarEventListenersMediciones();
 }
@@ -2106,7 +2073,6 @@ async function manejarSubmitRegistro(e) {
     }
     
     const form = e.target;
-    const boton = form.querySelector('button[type="submit"]');
     // Obtener fecha directamente como string YYYY-MM-DD (sin conversión a Date)
     const fechaInput = form.querySelector('#fecha-registro');
     const fecha = fechaInput ? fechaInput.value : null; // String directo: "2024-11-21"
@@ -2129,65 +2095,75 @@ async function manejarSubmitRegistro(e) {
         return;
     }
     
-    // 1. Mostrar estado de carga
-    if (boton) {
-        boton.classList.add('is-loading');
+    // ============================================
+    // PASO 1: Preparación de Datos (Optimista)
+    // ============================================
+    const datosRegistro = {
+        id: currentlyEditingRegistroId || Date.now(), // ID temporal para nuevos registros
+        fecha: fecha,
+        series: series,
+        notas: notas || ''
+    };
+    
+    // ============================================
+    // PASO 2: Actualización LOCAL Inmediata (Optimista)
+    // ============================================
+    // Guardar el ID de edición antes de resetearlo (necesario para el paso 4)
+    const registroIdParaFirebase = currentlyEditingRegistroId;
+    
+    // Asegurar que existe el array de registros
+    if (!ejercicioActual.registros) {
+        ejercicioActual.registros = [];
     }
     
-    try {
-        // Crear objeto de registro
-        const datosRegistro = {
-            fecha: fecha,
-            series: series,
-            notas: notas || ''
-        };
-        
-        // 2. Hacer el trabajo
-        if (currentlyEditingRegistroId !== null) {
-            // ESTAMOS EDITANDO
-            await actualizarRegistroEnEjercicio(entrenoActual.id, ejercicioActual.id, currentlyEditingRegistroId, datosRegistro);
-        } else {
-            // ESTAMOS CREANDO UN NUEVO REGISTRO
-            await agregarRegistroAEjercicio(entrenoActual.id, ejercicioActual.id, datosRegistro);
+    if (registroIdParaFirebase !== null) {
+        // ESTAMOS EDITANDO: Actualizar en memoria
+        const index = ejercicioActual.registros.findIndex(r => r.id === registroIdParaFirebase);
+        if (index !== -1) {
+            ejercicioActual.registros[index] = datosRegistro;
         }
-        
-        // Actualizar el ejercicio actual con los nuevos registros
-        ejercicioActual = await obtenerEjercicio(entrenoActual.id, ejercicioActual.id);
-        const registros = ejercicioActual.registros || [];
-        
-        // Actualizar la variable global de registros
-        registrosEjercicioGlobal = registros;
-        // Resetear a la página 1 para mostrar el nuevo registro
-        paginaActualEjercicio = 1;
-        
-        // Actualizar la lista de registros usando paginación
-        renderizarRegistrosPaginados();
-        
-        // Limpiar el formulario
-        form.reset();
-        
-        // Restaurar la fecha a hoy
-        form.querySelector('#fecha-registro').value = obtenerFechaLocal();
-        
-        // Resetear el ID de edición
-        currentlyEditingRegistroId = null;
-        
-        // Cambiar el texto del botón de vuelta a "Guardar"
-        if (boton) {
-            boton.textContent = 'Guardar';
-        }
-        
-        // Cerrar el modal después de guardar
-        ocultarModalRegistro();
-        
-    } catch (error) {
-        // 3. Manejar el error
-    } finally {
-        // 4. Quitar estado de carga (SIEMPRE se ejecuta)
-        if (boton) {
-            boton.classList.remove('is-loading');
-        }
+    } else {
+        // ESTAMOS CREANDO: Agregar nuevo al inicio (unshift)
+        ejercicioActual.registros.unshift(datosRegistro);
     }
+    
+    // Sincronizar variable global de paginación
+    registrosEjercicioGlobal = ejercicioActual.registros;
+    paginaActualEjercicio = 1; // Volver a la primera página para ver el cambio
+    
+    // ============================================
+    // PASO 3: Renderizado y Cierre de Modal (Feedback Instantáneo)
+    // ============================================
+    renderizarRegistrosPaginados();
+    ocultarModalRegistro();
+    
+    // Limpiar el formulario
+    form.reset();
+    
+    // Restaurar la fecha a hoy
+    form.querySelector('#fecha-registro').value = obtenerFechaLocal();
+    
+    // Resetear el ID de edición
+    currentlyEditingRegistroId = null;
+    
+    // Cambiar el texto del botón de vuelta a "Guardar"
+    const boton = form.querySelector('button[type="submit"]');
+    if (boton) {
+        boton.textContent = 'Guardar';
+    }
+    
+    // ============================================
+    // PASO 4: Sincronización en Segundo Plano (Fire and Forget)
+    // ============================================
+    const promesaFirebase = registroIdParaFirebase !== null
+        ? actualizarRegistroEnEjercicio(entrenoActual.id, ejercicioActual.id, registroIdParaFirebase, datosRegistro)
+        : agregarRegistroAEjercicio(entrenoActual.id, ejercicioActual.id, datosRegistro);
+    
+    promesaFirebase.catch(error => {
+        console.error("❌ Error de sincronización en segundo plano:", error);
+        // Notificar al usuario sin bloquear la UI
+        alert("Hubo un problema sincronizando con la nube, pero tus datos están guardados localmente.");
+    });
 }
 
 // Función para editar un registro

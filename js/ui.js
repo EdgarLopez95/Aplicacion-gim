@@ -1729,14 +1729,6 @@ export function renderizarPerfilView(datosPerfil = {}, perfilActual = null) {
         <button id="btn-editar-perfil" class="btn btn-editar-perfil">Editar Perfil</button>
         <button id="btn-registrar-medicion" class="btn btn-registrar-medicion">Registrar Medición</button>
         
-        ${(nombre === 'Valentina' || datosPerfil.id === 'valentina') ? `
-        <div style="margin-top: 20px; margin-bottom: 10px;">
-            <button id="btn-clonar-edgar" class="btn btn-secondary" style="width: 100%; border-color: #FF00CC; color: #FF00CC;">
-                👯 CLONAR DE EDGAR
-            </button>
-        </div>
-        ` : ''}
-        
         <div style="margin-top: 30px; margin-bottom: 20px; border-top: 1px solid #333; padding-top: 20px;">
             <button id="btn-cerrar-sesion" class="btn btn-secondary" style="width: 100%; border-color: #ff4444; color: #ff4444;">
                 Cerrar Sesión / Cambiar Perfil
