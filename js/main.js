@@ -73,7 +73,8 @@ import {
     renderizarCalendarioView,
     getCalendarioView,
     renderizarTablaHistorial,
-    formatearFechaVisual
+    formatearFechaVisual,
+    aplicarTema
 } from './ui.js';
 
 import {
@@ -83,6 +84,24 @@ import {
     obtenerPerfilActual,
     PERFILES
 } from './userSession.js';
+
+/**
+ * Convierte un color hexadecimal a rgba con transparencia
+ * @param {string} hex - Color hexadecimal (ej: '#dfff00')
+ * @param {number} alpha - Valor de transparencia (0-1)
+ * @returns {string} Color en formato rgba
+ */
+function hexToRgba(hex, alpha = 1) {
+    // Remover el # si existe
+    hex = hex.replace('#', '');
+    
+    // Convertir a RGB
+    const r = parseInt(hex.substring(0, 2), 16);
+    const g = parseInt(hex.substring(2, 4), 16);
+    const b = parseInt(hex.substring(4, 6), 16);
+    
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
 
 // Referencia al botón cancelar (está en el HTML del modal)
 let btnCancelarEjercicio = null;
@@ -758,6 +777,11 @@ function renderizarGraficaComposicion(historial, filtro = 'peso') {
 
 // Función para preparar datos según el filtro
 function prepararDatosGrafica(historial, filtro) {
+    // Obtener el color del tema actual desde el CSS
+    const themeColor = getComputedStyle(document.documentElement).getPropertyValue('--accent-color').trim();
+    // Crear una versión con transparencia para el fondo
+    const themeColorAlpha = themeColor.startsWith('#') ? hexToRgba(themeColor, 0.1) : themeColor;
+    
     // Formatear fechas de forma simple y consistente
     const fechas = historial.map(m => {
         try {
@@ -784,8 +808,8 @@ function prepararDatosGrafica(historial, filtro) {
             datasets = [{
                 label: 'Peso (kg)',
                 data: pesoData,
-                borderColor: '#00ff88',
-                backgroundColor: 'rgba(0, 255, 136, 0.1)',
+                borderColor: themeColor,
+                backgroundColor: themeColorAlpha,
                 tension: 0.4,
                 fill: false
             }];
@@ -986,79 +1010,37 @@ function configurarEventListenersPerfil() {
         });
     }
     
-    // Botón migrar datos (temporal, solo una vez)
-    const btnMigrarDatos = document.getElementById('btn-migrar-datos');
-    if (btnMigrarDatos) {
-        btnMigrarDatos.addEventListener('click', async function() {
-            const confirmar = confirm('⚠️ ¿Estás seguro de que quieres migrar los datos?\n\nEsto copiará todos los datos antiguos a la nueva estructura privada del usuario "edgar".\n\nSOLO EJECUTAR UNA VEZ.');
+    // Botón inicializar Valentina (temporal)
+    const btnInicializarValentina = document.getElementById('btn-inicializar-valentina');
+    if (btnInicializarValentina) {
+        btnInicializarValentina.addEventListener('click', async function() {
+            const confirmar = confirm('⚠️ ¿Estás seguro de que quieres inicializar el perfil de Valentina?\n\nEsto creará los entrenos base (Piernas, Push, Pull, Glúteos) con sus imágenes correspondientes.\n\nSOLO EJECUTAR UNA VEZ.');
             if (!confirmar) return;
             
-            // Deshabilitar el botón durante la migración
-            btnMigrarDatos.disabled = true;
-            btnMigrarDatos.textContent = '🔄 Migrando...';
+            // Deshabilitar el botón durante la inicialización
+            btnInicializarValentina.disabled = true;
+            btnInicializarValentina.textContent = '🔄 Inicializando...';
             
             try {
-                // Importar y ejecutar la migración
-                const { migrarDatos } = await import('./migration.js');
+                // Importar y ejecutar la función de inicialización
+                const { crearEntrenosValentina } = await import('./setupValentina.js');
+                await crearEntrenosValentina();
                 
-                console.log('🚀 Iniciando migración de datos...');
-                console.log('📦 Migrando entrenos...');
-                console.log('📦 Migrando historial...');
-                console.log('📦 Migrando categorías...');
+                // Ocultar el botón después de la inicialización exitosa
+                btnInicializarValentina.style.display = 'none';
                 
-                await migrarDatos();
-                
-                console.log('✅ Migración completada');
-                alert('✅ Migración completada exitosamente!\n\nTodos los datos han sido copiados a la nueva estructura privada.');
-                
-                // Ocultar el botón después de la migración exitosa
-                btnMigrarDatos.style.display = 'none';
+                // Recargar la página para mostrar los nuevos entrenos
+                window.location.reload();
             } catch (error) {
-                console.error('❌ Error durante la migración:', error);
-                alert('❌ Error durante la migración:\n\n' + error.message);
+                console.error('Error al inicializar perfil de Valentina:', error);
+                alert('Error al inicializar perfil de Valentina:\n\n' + error.message);
                 
                 // Rehabilitar el botón en caso de error
-                btnMigrarDatos.disabled = false;
-                btnMigrarDatos.textContent = '🛠️ MIGRAR DATOS (SOLO UNA VEZ)';
+                btnInicializarValentina.disabled = false;
+                btnInicializarValentina.textContent = '🚺 INICIALIZAR VALENTINA';
             }
         });
     }
-    
-    // Botón migrar ejercicios internos (temporal, solo una vez)
-    const btnMigrarEjercicios = document.getElementById('btn-migrar-ejercicios');
-    if (btnMigrarEjercicios) {
-        btnMigrarEjercicios.addEventListener('click', async function() {
-            const confirmar = confirm('⚠️ ¿Estás seguro de que quieres migrar los ejercicios internos de los entrenos?\n\nEsto copiará todos los ejercicios que están dentro de cada entreno a la nueva estructura privada del usuario "edgar".\n\nSOLO EJECUTAR UNA VEZ.');
-            if (!confirmar) return;
-            
-            // Deshabilitar el botón durante la migración
-            btnMigrarEjercicios.disabled = true;
-            btnMigrarEjercicios.textContent = '🔄 Migrando ejercicios...';
-            
-            try {
-                // Importar y ejecutar la migración
-                const { migrarSubcoleccionesEntrenos } = await import('./migration.js');
-                
-                console.log('🚀 Iniciando migración de ejercicios internos de entrenos...');
-                
-                await migrarSubcoleccionesEntrenos();
-                
-                console.log('✅ Migración de ejercicios internos completada');
-                alert('✅ Migración de ejercicios internos completada exitosamente!\n\nTodos los ejercicios dentro de los entrenos han sido copiados a la nueva estructura privada.');
-                
-                // Ocultar el botón después de la migración exitosa
-                btnMigrarEjercicios.style.display = 'none';
-            } catch (error) {
-                console.error('❌ Error durante la migración de ejercicios internos:', error);
-                alert('❌ Error durante la migración de ejercicios internos:\n\n' + error.message);
-                
-                // Rehabilitar el botón en caso de error
-                btnMigrarEjercicios.disabled = false;
-                btnMigrarEjercicios.textContent = '🛠️ MIGRAR EJERCICIOS INTERNOS';
-            }
-        });
-    }
-    
     
     // Configurar event listeners de mediciones
     configurarEventListenersMediciones();
@@ -1983,12 +1965,6 @@ function renderizarRegistrosPaginados() {
     // Calcular índices
     const inicio = (paginaActualEjercicio - 1) * REGISTROS_POR_PAGINA_EJERCICIO;
     const fin = inicio + REGISTROS_POR_PAGINA_EJERCICIO;
-    
-    // Console logs para depuración
-    console.log("--- Paginación Ejercicio ---");
-    console.log("Total registros:", registrosEjercicioGlobal.length);
-    console.log("Mostrando página:", paginaActualEjercicio);
-    console.log("Indices:", inicio + " a " + fin);
     
     // Obtener el slice del array
     const registrosSlice = registrosEjercicioGlobal.slice(inicio, fin);
@@ -3033,7 +3009,10 @@ async function initApp() {
             tabBar.style.display = 'flex';
         }
         
-        console.log("Usuario activo:", usuarioId);
+        // Aplicar tema del perfil
+        if (usuarioId && PERFILES[usuarioId]) {
+            aplicarTema(PERFILES[usuarioId]);
+        }
         
         // Actualizar header con información del usuario
         const perfil = obtenerPerfilActual();

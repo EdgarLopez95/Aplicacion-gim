@@ -154,7 +154,6 @@ function getCollectionPath(collectionName) {
     // pero para evitar errores en carga inicial, si no hay user, devolvemos la colección raíz (temporalmente)
     // o manejamos el error.
     if (!userId) {
-        console.warn("No hay usuario activo, usando ruta pública temporal o fallando.");
         // Opcional: throw new Error("Usuario no autenticado");
         return collectionName; 
     }
@@ -195,25 +194,32 @@ function getCollectionPath(collectionName) {
 // Función para cargar entrenos desde Firestore
 export async function cargarEntrenos() {
     try {
-        const entrenosCollection = collection(db, getCollectionPath('entrenos'));
-        const snapshot = await getDocsCacheFirst(entrenosCollection);
+        // 1. Obtener la ruta dinámica según el usuario activo
+        const path = getCollectionPath('entrenos');
+
+        // 2. Referencia a la colección
+        const entrenosCollection = collection(db, path);
         
+        // 3. Obtener datos (Cache-First)
+        const snapshot = await getDocsCacheFirst(entrenosCollection);
+
         if (snapshot.empty) {
-            return null;
+            return []; // Devolver array vacío para que la UI no se rompa
         }
         
+        // 4. Mapear datos
         const entrenos = [];
         snapshot.forEach(docSnapshot => {
             entrenos.push({
-                id: docSnapshot.data().id, // ID numérico para compatibilidad
-                firestoreId: docSnapshot.id, // ID del documento de Firestore (alfanumérico)
+                id: docSnapshot.data().id,
+                firestoreId: docSnapshot.id,
                 nombre: docSnapshot.data().nombre,
                 imagen: docSnapshot.data().imagen,
                 descripcion: docSnapshot.data().descripcion
             });
         });
         
-        // Ordenar por ID para mantener el orden
+        // 5. Ordenar
         entrenos.sort((a, b) => a.id - b.id);
         
         return entrenos;

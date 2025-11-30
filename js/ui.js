@@ -2,6 +2,26 @@
 
 import { obtenerUltimoRegistro } from './storage.js';
 
+/**
+ * Aplica el tema del perfil seleccionado actualizando las variables CSS y el meta tag
+ * @param {Object} perfil - Objeto del perfil con la propiedad theme
+ */
+export function aplicarTema(perfil) {
+    if (!perfil || !perfil.theme) return;
+
+    const root = document.documentElement;
+    
+    // 1. Cambiar Variables CSS
+    root.style.setProperty('--accent-color', perfil.theme.primary);
+    root.style.setProperty('--accent-hover', perfil.theme.hover);
+    
+    // 2. Cambiar color de la barra del navegador (Meta Theme Color)
+    const metaThemeColor = document.querySelector('meta[name="theme-color"]');
+    if (metaThemeColor) {
+        metaThemeColor.setAttribute('content', perfil.theme.primary);
+    }
+}
+
 // Función auxiliar para formatear fecha visual sin problemas de timezone
 export function formatearFechaVisual(fechaString) {
     if (!fechaString) return '--';
@@ -1709,13 +1729,13 @@ export function renderizarPerfilView(datosPerfil = {}) {
         <button id="btn-editar-perfil" class="btn btn-editar-perfil">Editar Perfil</button>
         <button id="btn-registrar-medicion" class="btn btn-registrar-medicion">Registrar Medición</button>
         
+        <div style="margin-top: 20px; margin-bottom: 10px;">
+            <button id="btn-inicializar-valentina" class="btn btn-secondary" style="width: 100%; border-color: #FF00CC; color: #FF00CC;">
+                🚺 INICIALIZAR VALENTINA
+            </button>
+        </div>
+        
         <div style="margin-top: 30px; margin-bottom: 20px; border-top: 1px solid #333; padding-top: 20px;">
-            <button id="btn-migrar-datos" class="btn btn-secondary" style="width: 100%; border-color: #ff9f0a; color: #ff9f0a; margin-bottom: 10px;">
-                🛠️ MIGRAR DATOS (SOLO UNA VEZ)
-            </button>
-            <button id="btn-migrar-ejercicios" class="btn btn-secondary" style="width: 100%; border-color: #ff9f0a; color: #ff9f0a; margin-bottom: 10px;">
-                🛠️ MIGRAR EJERCICIOS INTERNOS
-            </button>
             <button id="btn-cerrar-sesion" class="btn btn-secondary" style="width: 100%; border-color: #ff4444; color: #ff4444;">
                 Cerrar Sesión / Cambiar Perfil
             </button>

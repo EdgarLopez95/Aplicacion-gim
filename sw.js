@@ -102,25 +102,20 @@ self.addEventListener('fetch', event => {
                 // Primero verificar si está en caché
                 return cache.match(request).then(cachedResponse => {
                     if (cachedResponse) {
-                        // LOG DE ÉXITO (CACHE)
-                        console.log('%c✅ [SW] Imagen desde Caché:', 'color: green; font-weight: bold', request.url);
                         return cachedResponse;
                     }
-                    
-                    // LOG DE INTENTO (RED)
-                    console.log('%c⬇️ [SW] Descargando imagen nueva:', 'color: orange; font-weight: bold', request.url);
                     
                     // Si NO está en caché, intentar la red
                     // Intentar primero con CORS normal
                     return fetch(request).then(networkResponse => {
                         // Si la respuesta es válida y no es opaque, cachearla
                         if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+                            // Clonar la respuesta es OBLIGATORIO porque se consume dos veces (browser y cache)
                             const responseToCache = networkResponse.clone();
-                            cache.put(request, responseToCache).then(() => {
-                                // LOG DE GUARDADO
-                                console.log('%c💾 [SW] Imagen Guardada en Caché:', 'color: blue; font-weight: bold', request.url);
-                            }).catch(() => {
-                                // Error al cachear, continuar
+                            
+                            // Intentar guardar en caché (sin logs)
+                            cache.put(request, responseToCache).catch(() => {
+                                // Error al cachear, continuar silenciosamente
                             });
                         }
                         return networkResponse;
@@ -131,26 +126,22 @@ self.addEventListener('fetch', event => {
                         }).then(networkResponse => {
                             // Las respuestas "opaque" (no-cors) se pueden cachear pero tienen limitaciones
                             if (networkResponse) {
+                                // Clonar la respuesta es OBLIGATORIO porque se consume dos veces (browser y cache)
                                 const responseToCache = networkResponse.clone();
-                                cache.put(request, responseToCache).then(() => {
-                                    // LOG DE GUARDADO (no-cors)
-                                    console.log('%c💾 [SW] Imagen Guardada en Caché (no-cors):', 'color: blue; font-weight: bold', request.url);
-                                }).catch(() => {
-                                    // Error al cachear, continuar
+                                
+                                // Intentar guardar en caché (sin logs)
+                                cache.put(request, responseToCache).catch(() => {
+                                    // Error al cachear, continuar silenciosamente
                                 });
                             }
                             return networkResponse;
                         }).catch(error => {
-                            // LOG DE ERROR
-                            console.error('%c❌ [SW] Error descarga:', 'color: red; font-weight: bold', error, request.url);
                             // Si todo falla, lanzar error
                             throw error;
                         });
                     });
                 });
             }).catch(error => {
-                // LOG DE ERROR CRÍTICO
-                console.error('%c❌ [SW] Error crítico en caché:', 'color: red; font-weight: bold', error, request.url);
                 // Si hay error crítico, intentar fetch normal como último recurso
                 return fetch(request).catch(() => {
                     // Si incluso esto falla, devolver error
