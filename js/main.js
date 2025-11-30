@@ -1016,6 +1016,39 @@ function configurarEventListenersPerfil() {
         });
     }
     
+    // Botón clonar de Edgar (temporal)
+    const btnClonarEdgar = document.getElementById('btn-clonar-edgar');
+    if (btnClonarEdgar) {
+        btnClonarEdgar.addEventListener('click', async function() {
+            const confirmar = confirm('⚠️ ¿Estás seguro de que quieres clonar la configuración de Edgar?\n\n' +
+                'Esto copiará:\n' +
+                '• Todas las categorías musculares y ejercicios de biblioteca\n' +
+                '• Todos los entrenos y ejercicios (SIN historial de registros)\n\n' +
+                '⚠️ Esto SOBREESCRIBIRÁ la configuración actual de Valentina.\n\n' +
+                '¿Continuar?');
+            if (!confirmar) return;
+            
+            // Deshabilitar el botón durante la clonación
+            btnClonarEdgar.disabled = true;
+            btnClonarEdgar.textContent = '🔄 Clonando...';
+            
+            try {
+                // Importar y ejecutar la función de clonación
+                const { clonarEdgarAValentina } = await import('./cloneProfile.js');
+                await clonarEdgarAValentina();
+                
+                // El script recarga la página automáticamente
+            } catch (error) {
+                console.error('Error al clonar configuración:', error);
+                alert('Error al clonar configuración:\n\n' + error.message);
+                
+                // Rehabilitar el botón en caso de error
+                btnClonarEdgar.disabled = false;
+                btnClonarEdgar.textContent = '👯 CLONAR DE EDGAR';
+            }
+        });
+    }
+    
     // Configurar event listeners de mediciones
     configurarEventListenersMediciones();
 }
