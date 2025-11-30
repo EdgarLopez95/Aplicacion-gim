@@ -3,6 +3,49 @@
 import { obtenerUltimoRegistro } from './storage.js';
 
 /**
+ * Muestra una notificación Toast en la pantalla
+ * @param {string} mensaje - Mensaje a mostrar
+ * @param {string} tipo - Tipo de toast: 'success', 'error', 'info' (default: 'info')
+ * @param {number} duracion - Duración en milisegundos (default: 3000)
+ */
+export function showToast(mensaje, tipo = 'info', duracion = 3000) {
+    // Eliminar toast existente si hay uno
+    const toastExistente = document.querySelector('.toast-notification');
+    if (toastExistente) {
+        toastExistente.classList.remove('show');
+        toastExistente.classList.add('hide');
+        setTimeout(() => {
+            toastExistente.remove();
+        }, 300);
+    }
+    
+    // Crear nuevo toast
+    const toast = document.createElement('div');
+    toast.className = `toast-notification toast-${tipo}`;
+    toast.textContent = mensaje;
+    
+    // Insertar en el body
+    document.body.appendChild(toast);
+    
+    // Forzar reflow para que la animación funcione
+    void toast.offsetWidth;
+    
+    // Mostrar con animación
+    setTimeout(() => {
+        toast.classList.add('show');
+    }, 10);
+    
+    // Ocultar y eliminar después de la duración
+    setTimeout(() => {
+        toast.classList.remove('show');
+        toast.classList.add('hide');
+        setTimeout(() => {
+            toast.remove();
+        }, 300);
+    }, duracion);
+}
+
+/**
  * Aplica el tema del perfil seleccionado actualizando las variables CSS y el meta tag
  * @param {Object} perfil - Objeto del perfil con la propiedad theme
  */

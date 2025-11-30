@@ -74,7 +74,8 @@ import {
     getCalendarioView,
     renderizarTablaHistorial,
     formatearFechaVisual,
-    aplicarTema
+    aplicarTema,
+    showToast
 } from './ui.js';
 
 import {
@@ -1009,8 +1010,13 @@ function configurarEventListenersPerfil() {
     // Botón cerrar sesión / cambiar perfil
     const btnCerrarSesion = document.getElementById('btn-cerrar-sesion');
     if (btnCerrarSesion) {
-        btnCerrarSesion.addEventListener('click', function() {
-            if (confirm('¿Quieres cerrar sesión y cambiar de perfil?')) {
+        btnCerrarSesion.addEventListener('click', async function() {
+            const confirmado = await showConfirmationModal(
+                'Cerrar Sesión',
+                '¿Quieres cerrar sesión y cambiar de perfil?'
+            );
+            
+            if (confirmado) {
                 cerrarSesion();
             }
         });
@@ -3180,6 +3186,24 @@ async function initApp() {
                 .catch(error => {
                 });
         }
+        
+        // ============================================
+        // LISTENERS DE CONECTIVIDAD (Toast Notifications)
+        // ============================================
+        // Comprobación inicial: Si no hay conexión al abrir la app
+        if (!navigator.onLine) {
+            showToast('⚠️ Sin conexión a internet. Trabajando offline.', 'error');
+        }
+        
+        // Detectar pérdida de conexión
+        window.addEventListener('offline', () => {
+            showToast('⚠️ Sin conexión a internet. Trabajando offline.', 'error');
+        });
+        
+        // Detectar recuperación de conexión
+        window.addEventListener('online', () => {
+            showToast('✅ Conexión restablecida. Sincronizando...', 'success');
+        });
     } catch (error) {
     } finally {
         // Ocultar el loader global
