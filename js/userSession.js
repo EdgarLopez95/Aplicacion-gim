@@ -7,17 +7,17 @@ export const PERFILES = {
         nombre: 'Edgar', 
         avatar: 'https://firebasestorage.googleapis.com/v0/b/aplicacion-gim-d3e48.firebasestorage.app/o/foto-perfil.jpg?alt=media&token=fca49d32-9df9-4563-88ad-30f3036c222f',
         theme: {
-            primary: '#dfff00', // Verde actual
-            hover: '#BFFF00'   // Verde más oscuro
+            primary: '#dfff00', // Verde Neón
+            hover: '#BFFF00'
         }
     },
     valentina: { 
         id: 'valentina', 
         nombre: 'Valentina', 
-        avatar: 'images/favicon.png', // Placeholder temporal o una URL real si la tienes
+        avatar: 'https://firebasestorage.googleapis.com/v0/b/aplicacion-gim-d3e48.firebasestorage.app/o/foto%20perfil%20valen.jpeg?alt=media&token=6322d60a-b1e6-4a79-a9f4-e26c6f906998',
         theme: {
-            primary: '#FF00CC', // Rosa Neón Vibrante
-            hover: '#D100A8'    // Rosa más oscuro
+            primary: '#FF00CC', // Rosa Neón
+            hover: '#D100A8'
         }
     }
 };

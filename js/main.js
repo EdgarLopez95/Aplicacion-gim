@@ -578,13 +578,16 @@ async function mostrarVistaPerfil() {
         // 4. Obtener último registro para el resumen
         const ultimaMedicion = historial.length > 0 ? historial[historial.length - 1] : null;
         
-        // 5. Renderizar la vista con historial completo
+        // 5. Obtener perfil actual para el avatar
+        const perfilActual = obtenerPerfilActual();
+        
+        // 6. Renderizar la vista con historial completo
         renderizarPerfilView({ 
             ...datosPerfil, 
             imc,
             ultimaMedicion,
             historial
-        });
+        }, perfilActual);
         
         // 6. Mostrar la vista
         showView(document.getElementById('perfil-view'));
@@ -600,6 +603,9 @@ async function mostrarVistaPerfil() {
         }
         
     } catch (error) {
+        // Obtener perfil actual para el avatar incluso en caso de error
+        const perfilActual = obtenerPerfilActual();
+        
         // Renderizar vista vacía en caso de error
         renderizarPerfilView({ 
             nombre: '', 
@@ -609,7 +615,7 @@ async function mostrarVistaPerfil() {
             imc: { valor: null, categoria: 'No disponible' },
             ultimaMedicion: null,
             historial: []
-        });
+        }, perfilActual);
         showView(document.getElementById('perfil-view'));
         configurarEventListenersPerfil();
         historialCorporalGlobal = [];
@@ -1006,38 +1012,6 @@ function configurarEventListenersPerfil() {
         btnCerrarSesion.addEventListener('click', function() {
             if (confirm('¿Quieres cerrar sesión y cambiar de perfil?')) {
                 cerrarSesion();
-            }
-        });
-    }
-    
-    // Botón inicializar Valentina (temporal)
-    const btnInicializarValentina = document.getElementById('btn-inicializar-valentina');
-    if (btnInicializarValentina) {
-        btnInicializarValentina.addEventListener('click', async function() {
-            const confirmar = confirm('⚠️ ¿Estás seguro de que quieres inicializar el perfil de Valentina?\n\nEsto creará los entrenos base (Piernas, Push, Pull, Glúteos) con sus imágenes correspondientes.\n\nSOLO EJECUTAR UNA VEZ.');
-            if (!confirmar) return;
-            
-            // Deshabilitar el botón durante la inicialización
-            btnInicializarValentina.disabled = true;
-            btnInicializarValentina.textContent = '🔄 Inicializando...';
-            
-            try {
-                // Importar y ejecutar la función de inicialización
-                const { crearEntrenosValentina } = await import('./setupValentina.js');
-                await crearEntrenosValentina();
-                
-                // Ocultar el botón después de la inicialización exitosa
-                btnInicializarValentina.style.display = 'none';
-                
-                // Recargar la página para mostrar los nuevos entrenos
-                window.location.reload();
-            } catch (error) {
-                console.error('Error al inicializar perfil de Valentina:', error);
-                alert('Error al inicializar perfil de Valentina:\n\n' + error.message);
-                
-                // Rehabilitar el botón en caso de error
-                btnInicializarValentina.disabled = false;
-                btnInicializarValentina.textContent = '🚺 INICIALIZAR VALENTINA';
             }
         });
     }

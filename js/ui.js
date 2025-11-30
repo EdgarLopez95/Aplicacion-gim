@@ -1660,7 +1660,7 @@ function renderizarMetricas(datosPerfil, ultimaMedicion, imc) {
 }
 
 // Función para renderizar la vista de perfil
-export function renderizarPerfilView(datosPerfil = {}) {
+export function renderizarPerfilView(datosPerfil = {}, perfilActual = null) {
     actualizarReferenciasDOM();
     
     const perfilView = document.getElementById('perfil-view');
@@ -1675,8 +1675,8 @@ export function renderizarPerfilView(datosPerfil = {}) {
     const imc = datosPerfil.imc || { valor: null, categoria: 'No disponible' };
     const ultimaMedicion = datosPerfil.ultimaMedicion || null;
     
-    // URL de la foto de perfil (usando la del header)
-    const fotoPerfil = 'https://firebasestorage.googleapis.com/v0/b/aplicacion-gim-d3e48.firebasestorage.app/o/foto-perfil.jpg?alt=media&token=fca49d32-9df9-4563-88ad-30f3036c222f';
+    // URL de la foto de perfil: usar datosPerfil.foto si existe, sino usar el avatar del perfil actual, sino fallback
+    const fotoPerfil = datosPerfil.foto || (perfilActual ? perfilActual.avatar : 'images/favicon.png');
     
     const perfilHTML = `
         <div class="perfil-header">
@@ -1728,12 +1728,6 @@ export function renderizarPerfilView(datosPerfil = {}) {
         
         <button id="btn-editar-perfil" class="btn btn-editar-perfil">Editar Perfil</button>
         <button id="btn-registrar-medicion" class="btn btn-registrar-medicion">Registrar Medición</button>
-        
-        <div style="margin-top: 20px; margin-bottom: 10px;">
-            <button id="btn-inicializar-valentina" class="btn btn-secondary" style="width: 100%; border-color: #FF00CC; color: #FF00CC;">
-                🚺 INICIALIZAR VALENTINA
-            </button>
-        </div>
         
         <div style="margin-top: 30px; margin-bottom: 20px; border-top: 1px solid #333; padding-top: 20px;">
             <button id="btn-cerrar-sesion" class="btn btn-secondary" style="width: 100%; border-color: #ff4444; color: #ff4444;">
