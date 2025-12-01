@@ -1360,7 +1360,7 @@ export function ocultarModalRegistro() {
 }
 
 // Función para mostrar modal de confirmación
-export function showConfirmationModal(title, message) {
+export function showConfirmationModal(title, message, confirmText = 'Sí, Eliminar') {
     return new Promise((resolve) => {
         const modal = document.getElementById('confirmation-modal');
         const modalTitle = document.getElementById('modal-title');
@@ -1380,7 +1380,7 @@ export function showConfirmationModal(title, message) {
         // Mostrar ambos botones
         btnYes.style.display = 'block';
         btnNo.style.display = 'block';
-        btnYes.textContent = 'Sí, Eliminar';
+        btnYes.textContent = confirmText;
         btnYes.className = 'btn-danger';
         
         // Mostrar el modal

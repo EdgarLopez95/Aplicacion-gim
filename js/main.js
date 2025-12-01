@@ -1013,7 +1013,8 @@ function configurarEventListenersPerfil() {
         btnCerrarSesion.addEventListener('click', async function() {
             const confirmado = await showConfirmationModal(
                 'Cerrar Sesión',
-                '¿Quieres cerrar sesión y cambiar de perfil?'
+                '¿Quieres cerrar sesión y cambiar de perfil?',
+                'Sí, Salir'
             );
             
             if (confirmado) {
