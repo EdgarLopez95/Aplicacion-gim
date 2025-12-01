@@ -361,8 +361,19 @@ export async function obtenerEjerciciosDeEntreno(entrenoId) {
         }
         
         const ejerciciosCollection = collection(db, `${getCollectionPath('entrenos')}/${firestoreId}/ejercicios`);
-        const q = query(ejerciciosCollection, orderBy('id', 'asc'));
-        const snapshot = await getDocsCacheFirst(q);
+        
+        // Intentar ordenar por 'orden', si falla usar 'id' como fallback
+        let q;
+        let snapshot;
+        try {
+            q = query(ejerciciosCollection, orderBy('orden', 'asc'));
+            snapshot = await getDocsCacheFirst(q);
+        } catch (error) {
+            // Si falla (ej: algunos documentos no tienen 'orden' todavía), usar fallback
+            console.warn('⚠️ Algunos ejercicios no tienen campo "orden", usando ordenamiento por "id" como fallback');
+            q = query(ejerciciosCollection, orderBy('id', 'asc'));
+            snapshot = await getDocsCacheFirst(q);
+        }
         
         const ejercicios = [];
         
@@ -425,6 +436,7 @@ export async function obtenerEjerciciosDeEntreno(entrenoId) {
                         }
                         ejercicios.push({
                             id: ejercicioEntreno.id,
+                            firestoreId: docSnapshot.id, // ID del documento en Firestore (necesario para reordenamiento)
                             nombre: dataBiblioteca.nombre,
                             imagenUrl: dataBiblioteca.imagenUrl || null,
                             imagenBase64: dataBiblioteca.imagenUrl || null, // Compatibilidad
@@ -453,6 +465,7 @@ export async function obtenerEjerciciosDeEntreno(entrenoId) {
                         const nombreOriginal = data.nombre || 'Ejercicio no encontrado';
                         ejercicios.push({
                             id: ejercicioEntreno.id,
+                            firestoreId: docSnapshot.id, // ID del documento en Firestore (necesario para reordenamiento)
                             nombre: nombreOriginal + ' (Eliminado)',
                             imagenUrl: data.imagenUrl || null,
                             imagenBase64: data.imagenUrl || null,
@@ -482,6 +495,7 @@ export async function obtenerEjerciciosDeEntreno(entrenoId) {
                     const nombreOriginal = data.nombre || 'Error al cargar';
                     ejercicios.push({
                         id: ejercicioEntreno.id,
+                        firestoreId: docSnapshot.id, // ID del documento en Firestore (necesario para reordenamiento)
                         nombre: nombreOriginal + ' (Eliminado)',
                         imagenUrl: data.imagenUrl || null,
                         imagenBase64: data.imagenUrl || null,
@@ -1213,8 +1227,19 @@ export async function obtenerEjerciciosDeCategoria(categoriaId) {
     try {
         const categoriaRef = doc(db, getCollectionPath('categoriasMusculares'), categoriaId);
         const ejerciciosCollection = collection(categoriaRef, 'ejercicios');
-        const q = query(ejerciciosCollection, orderBy('fechaCreacion', 'asc'));
-        const snapshot = await getDocsCacheFirst(q);
+        
+        // Intentar ordenar por 'orden', si falla usar 'fechaCreacion' como fallback
+        let q;
+        let snapshot;
+        try {
+            q = query(ejerciciosCollection, orderBy('orden', 'asc'));
+            snapshot = await getDocsCacheFirst(q);
+        } catch (error) {
+            // Si falla (ej: algunos documentos no tienen 'orden' todavía), usar fallback
+            console.warn('⚠️ Algunos ejercicios no tienen campo "orden", usando ordenamiento por "fechaCreacion" como fallback');
+            q = query(ejerciciosCollection, orderBy('fechaCreacion', 'asc'));
+            snapshot = await getDocsCacheFirst(q);
+        }
         
         if (snapshot.empty) {
             return [];
@@ -1228,11 +1253,62 @@ export async function obtenerEjerciciosDeCategoria(categoriaId) {
                 nombre: data.nombre,
                 imagenUrl: data.imagenUrl || null,
                 fechaCreacion: data.fechaCreacion,
-                registros: data.registros || [] // Incluir registros del ejercicio
+                registros: data.registros || [], // Incluir registros del ejercicio
+                orden: data.orden !== undefined ? data.orden : ejercicios.length // Incluir orden si existe
             });
         });
         
         return ejercicios;
+    } catch (error) {
+        throw error;
+    }
+}
+
+// ============================================
+// FUNCIONES PARA REORDENAMIENTO
+// ============================================
+
+/**
+ * Actualiza el orden de los ejercicios en un entreno
+ * @param {string} entrenoFirestoreId - ID de Firestore del entreno
+ * @param {Array} ejerciciosConOrden - Array de objetos con { firestoreId, orden }
+ */
+export async function actualizarOrdenEjerciciosEntreno(entrenoFirestoreId, ejerciciosConOrden) {
+    try {
+        const { writeBatch } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+        const batch = writeBatch(db);
+        
+        const ejerciciosPath = `${getCollectionPath('entrenos')}/${entrenoFirestoreId}/ejercicios`;
+        
+        ejerciciosConOrden.forEach(({ firestoreId, orden }) => {
+            const ejercicioRef = doc(db, ejerciciosPath, firestoreId);
+            batch.update(ejercicioRef, { orden: orden });
+        });
+        
+        await batch.commit();
+    } catch (error) {
+        throw error;
+    }
+}
+
+/**
+ * Actualiza el orden de los ejercicios en una categoría
+ * @param {string} categoriaId - ID de la categoría
+ * @param {Array} ejerciciosConOrden - Array de objetos con { firestoreId, orden }
+ */
+export async function actualizarOrdenEjerciciosCategoria(categoriaId, ejerciciosConOrden) {
+    try {
+        const { writeBatch } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+        const batch = writeBatch(db);
+        
+        const ejerciciosPath = `${getCollectionPath('categoriasMusculares')}/${categoriaId}/ejercicios`;
+        
+        ejerciciosConOrden.forEach(({ firestoreId, orden }) => {
+            const ejercicioRef = doc(db, ejerciciosPath, firestoreId);
+            batch.update(ejercicioRef, { orden: orden });
+        });
+        
+        await batch.commit();
     } catch (error) {
         throw error;
     }

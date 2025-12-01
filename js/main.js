@@ -1,5 +1,8 @@
 // main.js - Orquestación principal de la aplicación
 
+import { db } from './firebase-config.js';
+import { doc, writeBatch } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
 import {
     cargarEntrenos,
     obtenerEjerciciosDeEntreno,
@@ -35,7 +38,9 @@ import {
     actualizarMedicion,
     eliminarMedicion,
     obtenerDiasEntrenados,
-    actualizarNombreEntreno
+    actualizarNombreEntreno,
+    actualizarOrdenEjerciciosEntreno,
+    actualizarOrdenEjerciciosCategoria
 } from './storage.js';
 
 import {
@@ -75,7 +80,10 @@ import {
     renderizarTablaHistorial,
     formatearFechaVisual,
     aplicarTema,
-    showToast
+    showToast,
+    renderizarModalReordenar,
+    renderizarListaReordenar,
+    ocultarModalReordenar
 } from './ui.js';
 
 import {
@@ -124,6 +132,11 @@ let categoriaActual = null;
 let paginaActualEjercicio = 1;
 const REGISTROS_POR_PAGINA_EJERCICIO = 4;
 let registrosEjercicioGlobal = []; // Para guardar la copia completa
+
+// Variables globales para reordenamiento
+let itemsParaReordenar = []; // Array temporal con los items que se están reordenando
+let coleccionDestinoReordenar = ''; // Ruta de Firebase para guardar después
+let funcionRecargaPostReordenar = null; // Función callback para recargar la vista después de guardar
 
 // Función auxiliar para manejar el clic en el botón "Añadir Ejercicio"
 async function manejarClicAnadirEjercicio() {
@@ -234,7 +247,94 @@ function configurarEventListenersEntrenoView() {
             }
         });
     }
+}
+
+/**
+ * Configura el botón de reordenar para la vista de entreno
+ */
+async function configurarBotonReordenarEntreno(entreno, ejercicios) {
+    const btnReordenar = document.getElementById('btn-reordenar-entreno');
+    if (!btnReordenar) return;
     
+    // Remover listener anterior si existe
+    const nuevoBtn = btnReordenar.cloneNode(true);
+    btnReordenar.parentNode.replaceChild(nuevoBtn, btnReordenar);
+    
+    nuevoBtn.addEventListener('click', async function() {
+        if (!ejercicios || ejercicios.length === 0) {
+            alert('No hay ejercicios para reordenar.');
+            return;
+        }
+        
+        // Preparar items para el modal (necesitan firestoreId y nombre)
+        const items = ejercicios.map(ej => ({
+            firestoreId: ej.firestoreId || ej.id, // Usar firestoreId si existe
+            id: ej.id,
+            nombre: ej.nombre || `Ejercicio ${ej.id}`,
+            orden: ej.orden !== undefined ? ej.orden : ejercicios.indexOf(ej)
+        }));
+        
+        // Configurar la ruta de Firebase
+        const entrenos = await cargarEntrenos();
+        const entrenoEncontrado = entrenos?.find(e => e.id === entreno.id);
+        if (!entrenoEncontrado || !entrenoEncontrado.firestoreId) {
+            alert('Error: No se pudo encontrar el entreno en Firebase.');
+            return;
+        }
+        
+        const userId = obtenerUsuarioActual();
+        const collectionPath = `usuarios/${userId}/entrenos/${entrenoEncontrado.firestoreId}/ejercicios`;
+        
+        // Función callback para recargar la vista
+        const callbackRecarga = async () => {
+            await mostrarVistaEntreno(entreno);
+        };
+        
+        // Abrir modal usando la función centralizada
+        abrirModalReordenar(items, collectionPath, callbackRecarga, `Reordenar: ${entreno.nombre}`);
+    });
+}
+
+/**
+ * Configura el botón de reordenar para la vista de categoría
+ */
+function configurarBotonReordenarCategoria(categoriaId, ejercicios) {
+    const btnReordenar = document.getElementById('btn-reordenar-categoria');
+    if (!btnReordenar) return;
+    
+    // Remover listener anterior si existe
+    const nuevoBtn = btnReordenar.cloneNode(true);
+    btnReordenar.parentNode.replaceChild(nuevoBtn, btnReordenar);
+    
+    nuevoBtn.addEventListener('click', function() {
+        if (!ejercicios || ejercicios.length === 0) {
+            alert('No hay ejercicios para reordenar.');
+            return;
+        }
+        
+        // Preparar items para el modal
+        const items = ejercicios.map(ej => ({
+            firestoreId: ej.id, // En categorías, el id es el firestoreId
+            id: ej.id,
+            nombre: ej.nombre || `Ejercicio ${ej.id}`,
+            orden: ej.orden !== undefined ? ej.orden : ejercicios.indexOf(ej)
+        }));
+        
+        // Configurar la ruta de Firebase
+        const userId = obtenerUsuarioActual();
+        const collectionPath = `usuarios/${userId}/categoriasMusculares/${categoriaId}/ejercicios`;
+        
+        // Función callback para recargar la vista
+        const callbackRecarga = async () => {
+            if (categoriaActual) {
+                await mostrarVistaCategoriaEjercicios(categoriaActual.id, categoriaActual.nombre);
+            }
+        };
+        
+        // Abrir modal usando la función centralizada
+        const categoriaNombre = categoriaActual?.nombre || 'Categoría';
+        abrirModalReordenar(items, collectionPath, callbackRecarga, `Reordenar: ${categoriaNombre}`);
+    });
 }
 
 // Función para configurar los event listeners del modal de selección
@@ -496,7 +596,10 @@ async function mostrarVistaEntreno(entreno) {
         // 3. Cuando lleguen, reemplaza el spinner
         renderizarListaEjercicios(ejercicios, null, eliminarEjercicio, mostrarVistaEjercicio, sustituirEjercicio, onToggle);
         
-        // 4. Actualizar barra de progreso
+        // 4. Configurar botón de reordenar
+        configurarBotonReordenarEntreno(entreno, ejercicios);
+        
+        // 5. Actualizar barra de progreso
         actualizarBarraProgreso();
         
     } catch (error) {
@@ -1025,6 +1128,190 @@ function configurarEventListenersPerfil() {
     
     // Configurar event listeners de mediciones
     configurarEventListenersMediciones();
+    
+    // Configurar event listeners del modal de reordenamiento
+    configurarEventListenersReordenar();
+}
+
+// ============================================
+// FUNCIONES PARA MODAL DE REORDENAMIENTO
+// ============================================
+
+/**
+ * Configura los event listeners del modal de reordenamiento
+ */
+function configurarEventListenersReordenar() {
+    // Botón cancelar
+    const btnCancelarReordenar = document.getElementById('btn-cancelar-reordenar');
+    if (btnCancelarReordenar) {
+        btnCancelarReordenar.addEventListener('click', function() {
+            ocultarModalReordenar();
+            itemsParaReordenar = [];
+            coleccionDestinoReordenar = '';
+            funcionRecargaPostReordenar = null;
+        });
+    }
+    
+    // Botón guardar - implementa la funcionalidad real
+    const btnGuardarOrden = document.getElementById('btn-guardar-orden');
+    if (btnGuardarOrden) {
+        btnGuardarOrden.addEventListener('click', async function() {
+            await guardarOrdenFirebase();
+        });
+    }
+    
+    // Delegación de eventos para los botones de mover (up/down)
+    const listaReordenar = document.getElementById('lista-reordenar');
+    if (listaReordenar) {
+        listaReordenar.addEventListener('click', function(e) {
+            const btnMove = e.target.closest('.btn-move');
+            if (!btnMove) return;
+            
+            const direction = btnMove.dataset.direction;
+            const currentIndex = parseInt(btnMove.dataset.index);
+            
+            if (direction === 'up' && currentIndex > 0) {
+                // Mover hacia arriba: dirección -1
+                moverItemReordenar(currentIndex, -1);
+            } else if (direction === 'down' && currentIndex < itemsParaReordenar.length - 1) {
+                // Mover hacia abajo: dirección 1
+                moverItemReordenar(currentIndex, 1);
+            }
+        });
+    }
+    
+    // Cerrar modal al hacer clic fuera del contenido
+    const modalReordenar = document.getElementById('modal-reordenar');
+    if (modalReordenar) {
+        modalReordenar.addEventListener('click', function(e) {
+            if (e.target === modalReordenar) {
+                ocultarModalReordenar();
+                itemsParaReordenar = [];
+                coleccionDestinoReordenar = '';
+                funcionRecargaPostReordenar = null;
+            }
+        });
+    }
+}
+
+/**
+ * Abre el modal de reordenamiento con los items proporcionados
+ * @param {Array} items - Array de items a reordenar
+ * @param {string} collectionPath - Ruta completa de Firebase (ej: "usuarios/edgar/entrenos/xxx/ejercicios")
+ * @param {Function} callbackRecarga - Función a ejecutar después de guardar para recargar la vista
+ * @param {string} titulo - Título del modal (opcional)
+ */
+function abrirModalReordenar(items, collectionPath, callbackRecarga, titulo = 'Reordenar') {
+    // Guardar en variables globales
+    itemsParaReordenar = items.map((item, index) => ({
+        ...item,
+        orden: item.orden !== undefined ? item.orden : index
+    }));
+    coleccionDestinoReordenar = collectionPath;
+    funcionRecargaPostReordenar = callbackRecarga;
+    
+    // Actualizar título del modal
+    const tituloModal = document.querySelector('#modal-reordenar h3');
+    if (tituloModal) {
+        tituloModal.textContent = titulo;
+    }
+    
+    // Renderizar la lista y mostrar el modal
+    renderizarListaReordenar(itemsParaReordenar);
+    
+    const modal = document.getElementById('modal-reordenar');
+    if (modal) {
+        modal.style.display = 'flex';
+    }
+}
+
+/**
+ * Mueve un item en el array de reordenamiento
+ * @param {number} index - Índice actual del item
+ * @param {number} direccion - -1 para subir, 1 para bajar
+ */
+function moverItemReordenar(index, direccion) {
+    if (index < 0 || index >= itemsParaReordenar.length) {
+        return;
+    }
+    
+    const nuevoIndex = index + direccion;
+    if (nuevoIndex < 0 || nuevoIndex >= itemsParaReordenar.length) {
+        return;
+    }
+    
+    // Intercambiar elementos en el array
+    [itemsParaReordenar[index], itemsParaReordenar[nuevoIndex]] = 
+    [itemsParaReordenar[nuevoIndex], itemsParaReordenar[index]];
+    
+    // Actualizar el campo 'orden' en cada item
+    itemsParaReordenar.forEach((item, idx) => {
+        item.orden = idx;
+    });
+    
+    // Volver a renderizar la lista
+    renderizarListaReordenar(itemsParaReordenar);
+}
+
+/**
+ * Guarda el nuevo orden en Firebase usando writeBatch
+ */
+async function guardarOrdenFirebase() {
+    if (!itemsParaReordenar || itemsParaReordenar.length === 0) {
+        alert('No hay elementos para guardar.');
+        return;
+    }
+    
+    if (!coleccionDestinoReordenar) {
+        alert('Error: No se ha configurado la colección de destino.');
+        return;
+    }
+    
+    const btnGuardar = document.getElementById('btn-guardar-orden');
+    if (btnGuardar) {
+        btnGuardar.disabled = true;
+        btnGuardar.textContent = 'Guardando...';
+    }
+    
+    try {
+        // Usar writeBatch importado estáticamente
+        const batch = writeBatch(db);
+        
+        // Recorrer itemsParaReordenar y añadir actualizaciones al batch
+        itemsParaReordenar.forEach((item, index) => {
+            const itemId = item.firestoreId || item.id;
+            const itemRef = doc(db, coleccionDestinoReordenar, itemId);
+            batch.update(itemRef, { orden: index });
+        });
+        
+        // Ejecutar el batch
+        await batch.commit();
+        
+        // Cerrar modal
+        ocultarModalReordenar();
+        
+        // Ejecutar función de recarga si existe
+        if (funcionRecargaPostReordenar && typeof funcionRecargaPostReordenar === 'function') {
+            await funcionRecargaPostReordenar();
+        }
+        
+        // Limpiar variables
+        itemsParaReordenar = [];
+        coleccionDestinoReordenar = '';
+        funcionRecargaPostReordenar = null;
+        
+        // Mostrar mensaje de éxito
+        showToast('✅ Orden guardado correctamente', 'success');
+        
+    } catch (error) {
+        console.error('Error al guardar orden:', error);
+        alert('Error al guardar el orden:\n\n' + error.message);
+    } finally {
+        if (btnGuardar) {
+            btnGuardar.disabled = false;
+            btnGuardar.textContent = 'Guardar Orden';
+        }
+    }
 }
 
 // Función para configurar event listeners de las tarjetas de mediciones
@@ -1644,6 +1931,9 @@ async function mostrarVistaCategoriaEjercicios(categoriaId, categoriaNombre) {
         
         // 3. Cuando lleguen, reemplaza el spinner
         renderizarListaEjerciciosCategoria(ejercicios, editarEjercicioCategoriaHandler, eliminarEjercicioCategoriaHandler);
+        
+        // 4. Configurar botón de reordenar
+        configurarBotonReordenarCategoria(categoriaId, ejercicios);
         
     } catch (error) {
         // Si falla, reemplaza el spinner con un error
@@ -3205,6 +3495,9 @@ async function initApp() {
         window.addEventListener('online', () => {
             showToast('✅ Conexión restablecida. Sincronizando...', 'success');
         });
+        
+        // Configurar event listeners del modal de reordenamiento
+        configurarEventListenersReordenar();
     } catch (error) {
     } finally {
         // Ocultar el loader global

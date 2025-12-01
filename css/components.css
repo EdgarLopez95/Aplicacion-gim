@@ -63,6 +63,26 @@
     gap: 4px;
 }
 
+.btn-icon:hover {
+    background-color: var(--bg-tertiary);
+    border-color: var(--accent-color);
+    color: var(--accent-color);
+}
+
+/* Estilos específicos para botón de reordenar (transparente con borde) */
+.btn-icon[style*="background: transparent"] {
+    background: transparent !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    color: var(--text-primary);
+}
+
+.btn-icon[style*="background: transparent"]:hover {
+    background: rgba(255, 255, 255, 0.05) !important;
+    border-color: var(--accent-color) !important;
+    color: var(--accent-color) !important;
+    transform: scale(1.05);
+}
+
 .btn-icon-small {
     background-color: var(--bg-secondary);
     border: none;
@@ -1573,6 +1593,69 @@
         padding: 14px 20px;
         font-size: 13px;
     }
+}
+
+/* ============================================
+   ESTILOS PARA MODAL DE REORDENAMIENTO
+   ============================================ */
+
+.reorder-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 60vh;
+    overflow-y: auto;
+    margin-bottom: 20px;
+}
+
+.reorder-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background-color: var(--bg-secondary);
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.reorder-item span {
+    flex: 1;
+    font-weight: 500;
+    margin-right: 10px;
+}
+
+.reorder-controls {
+    display: flex;
+    gap: 4px;
+}
+
+.btn-move {
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    color: var(--text-primary);
+    width: 30px;
+    height: 30px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.btn-move:hover {
+    background: var(--accent-color);
+    color: black;
+}
+
+.btn-move:disabled {
+    opacity: 0.3;
+    cursor: default;
+}
+
+.btn-move:disabled:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
 }
 
 

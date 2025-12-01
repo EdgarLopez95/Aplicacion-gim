@@ -322,7 +322,14 @@ export function renderizarEntrenoView(entreno) {
     
     const entrenoHTML = `
         ${renderizarBotonVolver()}
-        <h2 id="entreno-titulo">${entreno.nombre}</h2>
+        <div class="view-header" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+            <h2 id="entreno-titulo" style="margin: 0;">${entreno.nombre}</h2>
+            <button id="btn-reordenar-entreno" class="btn-icon" style="background: transparent; border: 1px solid rgba(255,255,255,0.2); padding: 8px; border-radius: 8px; cursor: pointer; transition: all 0.2s;">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M7 15l5 5 5-5M7 9l5-5 5 5"/>
+                </svg>
+            </button>
+        </div>
         <div id="breadcrumbs" class="breadcrumbs-container"></div>
         <div class="progress-wrapper">
             <div class="progress-header">
@@ -603,7 +610,14 @@ export function renderizarCategoriaEjerciciosView(categoriaNombre) {
     
     const categoriaEjerciciosHTML = `
         ${renderizarBotonVolver()}
-        <h2 id="categoria-ejercicios-titulo">${categoriaNombre.toUpperCase()}</h2>
+        <div class="view-header" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+            <h2 id="categoria-ejercicios-titulo" style="margin: 0;">${categoriaNombre.toUpperCase()}</h2>
+            <button id="btn-reordenar-categoria" class="btn-icon" style="background: transparent; border: 1px solid rgba(255,255,255,0.2); padding: 8px; border-radius: 8px; cursor: pointer; transition: all 0.2s;">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M7 15l5 5 5-5M7 9l5-5 5 5"/>
+                </svg>
+            </button>
+        </div>
         <div id="breadcrumbs" class="breadcrumbs-container"></div>
         <div id="lista-ejercicios-categoria-container" class="lista-ejercicios">
             <div class="loader-spinner" style="margin: 40px auto;"></div>
@@ -2257,5 +2271,82 @@ export function renderizarCalendarioView(diasEntrenados = [], racha = 0, fechaRe
 // Función para obtener la vista de calendario
 export function getCalendarioView() {
     return document.getElementById('calendario-view');
+}
+
+// ============================================
+// FUNCIÓN PARA MODAL DE REORDENAMIENTO
+// ============================================
+
+/**
+ * Renderiza la lista de items dentro del modal de reordenamiento
+ * @param {Array} items - Array de objetos con { id, nombre } o propiedades personalizadas
+ */
+export function renderizarListaReordenar(items) {
+    const listaReordenar = document.getElementById('lista-reordenar');
+    const tituloModal = document.querySelector('#modal-reordenar h3');
+    
+    if (!listaReordenar) {
+        console.error('❌ No se encontró el contenedor de lista de reordenamiento en el DOM');
+        return;
+    }
+    
+    // Generar HTML de los items
+    let itemsHTML = '';
+    items.forEach((item, index) => {
+        const nombre = item.nombre || item.titulo || `Item ${index + 1}`;
+        const itemId = item.id || index;
+        
+        itemsHTML += `
+            <div class="reorder-item" data-index="${index}">
+                <span>${nombre}</span>
+                <div class="reorder-controls">
+                    <button class="btn-move btn-move-up" data-index="${index}" data-direction="up" ${index === 0 ? 'disabled' : ''}>
+                        ▲
+                    </button>
+                    <button class="btn-move btn-move-down" data-index="${index}" data-direction="down" ${index === items.length - 1 ? 'disabled' : ''}>
+                        ▼
+                    </button>
+                </div>
+            </div>
+        `;
+    });
+    
+    listaReordenar.innerHTML = itemsHTML;
+}
+
+/**
+ * Renderiza el modal de reordenamiento con una lista de items (función legacy, mantener por compatibilidad)
+ * @param {Array} items - Array de objetos con { id, nombre } o propiedades personalizadas
+ * @param {string} titulo - Título del modal (opcional, por defecto "Reordenar")
+ */
+export function renderizarModalReordenar(items, titulo = 'Reordenar') {
+    const modal = document.getElementById('modal-reordenar');
+    const tituloModal = modal?.querySelector('h3');
+    
+    if (!modal) {
+        console.error('❌ No se encontró el modal de reordenamiento en el DOM');
+        return;
+    }
+    
+    // Actualizar título
+    if (tituloModal) {
+        tituloModal.textContent = titulo;
+    }
+    
+    // Renderizar la lista
+    renderizarListaReordenar(items);
+    
+    // Mostrar el modal
+    modal.style.display = 'flex';
+}
+
+/**
+ * Oculta el modal de reordenamiento
+ */
+export function ocultarModalReordenar() {
+    const modal = document.getElementById('modal-reordenar');
+    if (modal) {
+        modal.style.display = 'none';
+    }
 }
 
