@@ -1,7 +1,7 @@
 // main.js - Orquestación principal de la aplicación
 
 import { db } from './firebase-config.js';
-import { doc, writeBatch } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+import { doc, writeBatch, updateDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
 import {
     cargarEntrenos,
@@ -40,7 +40,11 @@ import {
     obtenerDiasEntrenados,
     actualizarNombreEntreno,
     actualizarOrdenEjerciciosEntreno,
-    actualizarOrdenEjerciciosCategoria
+    actualizarOrdenEjerciciosCategoria,
+    obtenerEjercicioDeBiblioteca,
+    obtenerHistorialGlobal,
+    getCollectionPath,
+    getDocCacheFirst
 } from './storage.js';
 
 import {
@@ -261,17 +265,21 @@ async function configurarBotonReordenarEntreno(entreno, ejercicios) {
     btnReordenar.parentNode.replaceChild(nuevoBtn, btnReordenar);
     
     nuevoBtn.addEventListener('click', async function() {
-        if (!ejercicios || ejercicios.length === 0) {
+        // CRÍTICO: Obtener datos frescos al momento de abrir el modal
+        // Esto asegura que ejercicios eliminados no aparezcan en el modal
+        const ejerciciosFrescos = await obtenerEjerciciosDeEntreno(entreno.id);
+        
+        if (!ejerciciosFrescos || ejerciciosFrescos.length === 0) {
             alert('No hay ejercicios para reordenar.');
             return;
         }
         
-        // Preparar items para el modal (necesitan firestoreId y nombre)
-        const items = ejercicios.map(ej => ({
+        // Preparar items para el modal (necesitan firestoreId y nombre) usando datos frescos
+        const items = ejerciciosFrescos.map(ej => ({
             firestoreId: ej.firestoreId || ej.id, // Usar firestoreId si existe
             id: ej.id,
             nombre: ej.nombre || `Ejercicio ${ej.id}`,
-            orden: ej.orden !== undefined ? ej.orden : ejercicios.indexOf(ej)
+            orden: ej.orden !== undefined ? ej.orden : ejerciciosFrescos.indexOf(ej)
         }));
         
         // Configurar la ruta de Firebase
@@ -290,7 +298,7 @@ async function configurarBotonReordenarEntreno(entreno, ejercicios) {
             await mostrarVistaEntreno(entreno);
         };
         
-        // Abrir modal usando la función centralizada
+        // Abrir modal usando la función centralizada con datos frescos
         abrirModalReordenar(items, collectionPath, callbackRecarga, `Reordenar: ${entreno.nombre}`);
     });
 }
@@ -306,18 +314,22 @@ function configurarBotonReordenarCategoria(categoriaId, ejercicios) {
     const nuevoBtn = btnReordenar.cloneNode(true);
     btnReordenar.parentNode.replaceChild(nuevoBtn, btnReordenar);
     
-    nuevoBtn.addEventListener('click', function() {
-        if (!ejercicios || ejercicios.length === 0) {
+    nuevoBtn.addEventListener('click', async function() {
+        // CRÍTICO: Obtener datos frescos al momento de abrir el modal
+        // Esto asegura que ejercicios eliminados no aparezcan en el modal
+        const ejerciciosFrescos = await obtenerEjerciciosDeCategoria(categoriaId);
+        
+        if (!ejerciciosFrescos || ejerciciosFrescos.length === 0) {
             alert('No hay ejercicios para reordenar.');
             return;
         }
         
-        // Preparar items para el modal
-        const items = ejercicios.map(ej => ({
+        // Preparar items para el modal usando datos frescos
+        const items = ejerciciosFrescos.map(ej => ({
             firestoreId: ej.id, // En categorías, el id es el firestoreId
             id: ej.id,
             nombre: ej.nombre || `Ejercicio ${ej.id}`,
-            orden: ej.orden !== undefined ? ej.orden : ejercicios.indexOf(ej)
+            orden: ej.orden !== undefined ? ej.orden : ejerciciosFrescos.indexOf(ej)
         }));
         
         // Configurar la ruta de Firebase
@@ -331,7 +343,7 @@ function configurarBotonReordenarCategoria(categoriaId, ejercicios) {
             }
         };
         
-        // Abrir modal usando la función centralizada
+        // Abrir modal usando la función centralizada con datos frescos
         const categoriaNombre = categoriaActual?.nombre || 'Categoría';
         abrirModalReordenar(items, collectionPath, callbackRecarga, `Reordenar: ${categoriaNombre}`);
     });
@@ -1090,25 +1102,6 @@ function configurarEventListenersPerfil() {
             }
         });
     });
-    
-    // Botón borrar historial
-    const btnBorrarHistorial = document.getElementById('btn-borrar-historial');
-    if (btnBorrarHistorial) {
-        btnBorrarHistorial.addEventListener('click', async function() {
-            const confirmar = confirm('¿Estás seguro de que quieres borrar TODO el historial corporal? Esta acción no se puede deshacer.');
-            if (!confirmar) return;
-            
-            try {
-                await borrarTodoHistorialCorporal();
-                historialCorporalGlobal = [];
-                // Recargar la vista
-                await mostrarVistaPerfil();
-                alert('Historial borrado correctamente');
-            } catch (error) {
-                alert('Error al borrar el historial. Por favor, intenta de nuevo.');
-            }
-        });
-    }
     
     // Botón cerrar sesión / cambiar perfil
     const btnCerrarSesion = document.getElementById('btn-cerrar-sesion');
@@ -1930,7 +1923,9 @@ async function mostrarVistaCategoriaEjercicios(categoriaId, categoriaNombre) {
         const ejercicios = await obtenerEjerciciosDeCategoria(categoriaId);
         
         // 3. Cuando lleguen, reemplaza el spinner
-        renderizarListaEjerciciosCategoria(ejercicios, editarEjercicioCategoriaHandler, eliminarEjercicioCategoriaHandler);
+        renderizarListaEjerciciosCategoria(ejercicios, editarEjercicioCategoriaHandler, eliminarEjercicioCategoriaHandler, (ejercicioId) => {
+            mostrarVistaEjercicioDesdeBiblioteca(ejercicioId, categoriaId);
+        });
         
         // 4. Configurar botón de reordenar
         configurarBotonReordenarCategoria(categoriaId, ejercicios);
@@ -2280,8 +2275,16 @@ async function mostrarVistaEjercicio(ejercicioId) {
     
     ejercicioActual = ejercicio;
     
-    // Obtener registros (si existen) y guardarlos en la variable global
-    const registros = ejercicio.registros || [];
+    // Obtener registros: Si tiene bibliotecaId y categoriaId, usar historial global
+    let registros = [];
+    if (ejercicio.bibliotecaId && ejercicio.categoriaId) {
+        // Leer desde la fuente de verdad (Biblioteca Global)
+        registros = await obtenerHistorialGlobal(ejercicio.categoriaId, ejercicio.bibliotecaId);
+    } else {
+        // Fallback: usar registros locales (ejercicios viejos/custom sin biblioteca)
+        registros = ejercicio.registros || [];
+    }
+    
     registrosEjercicioGlobal = registros;
     
     // Resetear la página a la primera
@@ -2320,6 +2323,339 @@ async function mostrarVistaEjercicio(ejercicioId) {
     configurarEventListenersEjercicioView();
     
     // El botón volver ahora se maneja con delegación de eventos global en initApp
+}
+
+// Función para mostrar la vista de ejercicio desde la biblioteca (historial global)
+async function mostrarVistaEjercicioDesdeBiblioteca(ejercicioId, categoriaId) {
+    if (!categoriaId) {
+        console.error('categoriaId es requerido para mostrar ejercicio desde biblioteca');
+        return;
+    }
+    
+    // Obtener el ejercicio directamente de la biblioteca
+    const ejercicio = await obtenerEjercicioDeBiblioteca(categoriaId, ejercicioId);
+    if (!ejercicio) {
+        alert('Ejercicio no encontrado en la biblioteca');
+        return;
+    }
+    
+    // Guardar el ejercicio actual y contexto
+    ejercicioActual = ejercicio;
+    categoriaActual = { id: categoriaId };
+    entrenoActual = null; // No hay entreno en modo biblioteca
+    
+    // Obtener registros (historial global)
+    const registros = ejercicio.registros || [];
+    registrosEjercicioGlobal = registros;
+    
+    // Resetear la página a la primera
+    paginaActualEjercicio = 1;
+    
+    // Resetear el ID de edición de registro
+    currentlyEditingRegistroId = null;
+    
+    // 1. Renderizar la vista completa
+    renderizarEjercicioView(ejercicio, [], editarRegistroDesdeBiblioteca, eliminarRegistroDesdeBiblioteca);
+    
+    // 2. Mostrar la vista
+    showView(getEjercicioView());
+    
+    // 3. Renderizar registros paginados después de que la vista esté en el DOM
+    renderizarRegistrosPaginados();
+    
+    // 4. Actualizar breadcrumbs
+    setTimeout(() => {
+        const ejercicioView = getEjercicioView();
+        const breadcrumbsContainer = ejercicioView ? ejercicioView.querySelector('#breadcrumbs') : null;
+        
+        actualizarBreadcrumbs([
+            { texto: 'Categorías', vista: 'biblioteca-view' },
+            { texto: categoriaActual.nombre || 'Categoría', vista: 'categoria-ejercicios-view', action: 'mostrarVistaCategoriaEjercicios', param: categoriaId },
+            { texto: ejercicio.nombre }
+        ], manejarNavegacionBreadcrumbs, breadcrumbsContainer);
+    }, 10);
+    
+    // 5. Configurar event listeners (modo biblioteca)
+    configurarEventListenersEjercicioViewDesdeBiblioteca(categoriaId, ejercicioId);
+}
+
+// Función para configurar event listeners de la vista de ejercicio desde biblioteca
+function configurarEventListenersEjercicioViewDesdeBiblioteca(categoriaId, ejercicioId) {
+    const formNuevoRegistro = getFormNuevoRegistro();
+    const btnAbrirModalRegistro = document.getElementById('btn-abrir-modal-registro');
+    const btnCancelarRegistro = document.getElementById('btn-cancelar-registro');
+    
+    // Botón para abrir modal de registro
+    if (btnAbrirModalRegistro) {
+        btnAbrirModalRegistro.addEventListener('click', async function() {
+            currentlyEditingRegistroId = null;
+            ocultarModalRegistro();
+            setTimeout(async () => {
+                // En modo biblioteca, no hay entrenoId, pero sí categoriaId y ejercicioId
+                await mostrarModalRegistro(null, null);
+            }, 10);
+        });
+    }
+    
+    // Botón cancelar del modal
+    if (btnCancelarRegistro) {
+        btnCancelarRegistro.addEventListener('click', function() {
+            ocultarModalRegistro();
+        });
+    }
+    
+    // Formulario de nuevo registro
+    if (formNuevoRegistro) {
+        formNuevoRegistro.addEventListener('submit', manejarSubmitRegistroDesdeBiblioteca);
+    }
+}
+
+// Función para editar un registro desde la biblioteca
+function editarRegistroDesdeBiblioteca(registroId) {
+    if (!ejercicioActual || !categoriaActual) {
+        return;
+    }
+    
+    const registros = ejercicioActual.registros || [];
+    const registro = registros.find(r => r.id === registroId);
+    
+    if (!registro) {
+        return;
+    }
+    
+    currentlyEditingRegistroId = registroId;
+    
+    const form = document.getElementById('form-nuevo-registro');
+    if (!form) {
+        return;
+    }
+    
+    // Poblar formulario (similar a editarRegistro)
+    const fechaInput = form.querySelector('#fecha-registro');
+    if (fechaInput) {
+        if (typeof registro.fecha === 'string' && registro.fecha.match(/^\d{4}-\d{2}-\d{2}$/)) {
+            fechaInput.value = registro.fecha;
+        } else {
+            const fecha = new Date(registro.fecha);
+            const year = fecha.getFullYear();
+            const month = String(fecha.getMonth() + 1).padStart(2, '0');
+            const day = String(fecha.getDate()).padStart(2, '0');
+            fechaInput.value = `${year}-${month}-${day}`;
+        }
+    }
+    
+    const series = registro.series || [];
+    for (let i = 1; i <= 4; i++) {
+        const serie = series[i - 1];
+        const pesoInput = form.querySelector(`#peso-serie-${i}`);
+        const repInput = form.querySelector(`#rep-serie-${i}`);
+        
+        if (pesoInput && repInput) {
+            if (serie && serie.peso && serie.repeticiones) {
+                pesoInput.value = serie.peso;
+                repInput.value = serie.repeticiones;
+            } else {
+                pesoInput.value = '';
+                repInput.value = '';
+            }
+        }
+    }
+    
+    const notasInput = form.querySelector('#notas-registro');
+    if (notasInput) {
+        notasInput.value = registro.notas || '';
+    }
+    
+    const boton = form.querySelector('button[type="submit"]');
+    if (boton) {
+        boton.textContent = 'Actualizar';
+    }
+    
+    mostrarModalRegistro();
+}
+
+// Función para eliminar un registro desde la biblioteca
+async function eliminarRegistroDesdeBiblioteca(registroId) {
+    if (!ejercicioActual || !categoriaActual) {
+        return;
+    }
+    
+    const confirmado = await showConfirmationModal(
+        'Eliminar Registro',
+        '¿Estás seguro de que quieres eliminar este registro? Esta acción no se puede deshacer.'
+    );
+    
+    if (!confirmado) {
+        return;
+    }
+    
+    try {
+        // Eliminar de la biblioteca directamente
+        const bibliotecaPath = getCollectionPath('categoriasMusculares');
+        const ejercicioRef = doc(db, `${bibliotecaPath}/${categoriaActual.id}/ejercicios/${ejercicioActual.id}`);
+        const ejercicioDoc = await getDocCacheFirst(ejercicioRef);
+        
+        if (!ejercicioDoc.exists()) {
+            throw new Error('Ejercicio no encontrado');
+        }
+        
+        const registros = (ejercicioDoc.data().registros || []).filter(r => r.id !== registroId);
+        
+        await updateDoc(ejercicioRef, {
+            registros: registros
+        });
+        
+        // Actualizar ejercicio actual y recargar
+        ejercicioActual.registros = registros;
+        registrosEjercicioGlobal = registros;
+        paginaActualEjercicio = 1;
+        renderizarRegistrosPaginados();
+        
+    } catch (error) {
+        console.error('Error al eliminar registro:', error);
+        alert('Error al eliminar el registro. Por favor, intenta de nuevo.');
+    }
+}
+
+// Función para manejar el submit del formulario de registro desde biblioteca
+async function manejarSubmitRegistroDesdeBiblioteca(e) {
+    e.preventDefault();
+    
+    if (!ejercicioActual || !categoriaActual) {
+        return;
+    }
+    
+    const form = e.target;
+    const fechaInput = form.querySelector('#fecha-registro');
+    const fecha = fechaInput ? fechaInput.value : null;
+    const notas = form.querySelector('#notas-registro').value.trim();
+    
+    const series = [];
+    for (let i = 1; i <= 4; i++) {
+        const peso = parseFloat(form.querySelector(`#peso-serie-${i}`).value);
+        const repeticiones = parseInt(form.querySelector(`#rep-serie-${i}`).value);
+        
+        if (peso && repeticiones) {
+            series.push({ peso, repeticiones });
+        }
+    }
+    
+    if (series.length === 0) {
+        alert('Por favor, completa al menos una serie con peso y repeticiones');
+        return;
+    }
+    
+    const datosRegistro = {
+        id: currentlyEditingRegistroId || Date.now(),
+        fecha: fecha,
+        series: series,
+        notas: notas || ''
+    };
+    
+    const registroIdParaFirebase = currentlyEditingRegistroId;
+    
+    if (!ejercicioActual.registros) {
+        ejercicioActual.registros = [];
+    }
+    
+    if (registroIdParaFirebase !== null) {
+        const index = ejercicioActual.registros.findIndex(r => r.id === registroIdParaFirebase);
+        if (index !== -1) {
+            ejercicioActual.registros[index] = datosRegistro;
+        }
+    } else {
+        ejercicioActual.registros.unshift(datosRegistro);
+    }
+    
+    registrosEjercicioGlobal = ejercicioActual.registros;
+    paginaActualEjercicio = 1;
+    
+    renderizarRegistrosPaginados();
+    ocultarModalRegistro();
+    
+    form.reset();
+    form.querySelector('#fecha-registro').value = obtenerFechaLocal();
+    currentlyEditingRegistroId = null;
+    
+    const boton = form.querySelector('button[type="submit"]');
+    if (boton) {
+        boton.textContent = 'Guardar';
+    }
+    
+    // Sincronizar con Firebase
+    const promesaFirebase = registroIdParaFirebase !== null
+        ? actualizarRegistroEnEjercicioDesdeBiblioteca(categoriaActual.id, ejercicioActual.id, registroIdParaFirebase, datosRegistro)
+        : agregarRegistroAEjercicioDesdeBiblioteca(categoriaActual.id, ejercicioActual.id, datosRegistro);
+    
+    promesaFirebase.catch(error => {
+        console.error("❌ Error de sincronización en segundo plano:", error);
+        alert("Hubo un problema sincronizando con la nube, pero tus datos están guardados localmente.");
+    });
+}
+
+// Función auxiliar para agregar registro desde biblioteca
+async function agregarRegistroAEjercicioDesdeBiblioteca(categoriaId, ejercicioId, nuevoRegistro) {
+    const bibliotecaPath = getCollectionPath('categoriasMusculares');
+    const ejercicioRef = doc(db, `${bibliotecaPath}/${categoriaId}/ejercicios/${ejercicioId}`);
+    const ejercicioDoc = await getDocCacheFirst(ejercicioRef);
+    
+    if (!ejercicioDoc.exists()) {
+        throw new Error('Ejercicio no encontrado');
+    }
+    
+    nuevoRegistro.id = Date.now();
+    
+    if (nuevoRegistro.fecha && typeof nuevoRegistro.fecha !== 'string') {
+        const fechaObj = new Date(nuevoRegistro.fecha);
+        const year = fechaObj.getFullYear();
+        const month = String(fechaObj.getMonth() + 1).padStart(2, '0');
+        const day = String(fechaObj.getDate()).padStart(2, '0');
+        nuevoRegistro.fecha = `${year}-${month}-${day}`;
+    }
+    
+    const registros = ejercicioDoc.data().registros || [];
+    registros.unshift(nuevoRegistro);
+    
+    await updateDoc(ejercicioRef, {
+        registros: registros
+    });
+    
+    return true;
+}
+
+// Función auxiliar para actualizar registro desde biblioteca
+async function actualizarRegistroEnEjercicioDesdeBiblioteca(categoriaId, ejercicioId, registroId, datosActualizados) {
+    const bibliotecaPath = getCollectionPath('categoriasMusculares');
+    const ejercicioRef = doc(db, `${bibliotecaPath}/${categoriaId}/ejercicios/${ejercicioId}`);
+    const ejercicioDoc = await getDocCacheFirst(ejercicioRef);
+    
+    if (!ejercicioDoc.exists()) {
+        throw new Error('Ejercicio no encontrado');
+    }
+    
+    datosActualizados.id = registroId;
+    
+    if (datosActualizados.fecha && typeof datosActualizados.fecha !== 'string') {
+        const fechaObj = new Date(datosActualizados.fecha);
+        const year = fechaObj.getFullYear();
+        const month = String(fechaObj.getMonth() + 1).padStart(2, '0');
+        const day = String(fechaObj.getDate()).padStart(2, '0');
+        datosActualizados.fecha = `${year}-${month}-${day}`;
+    }
+    
+    const registros = ejercicioDoc.data().registros || [];
+    const index = registros.findIndex(r => r.id === registroId);
+    if (index === -1) {
+        throw new Error('Registro no encontrado');
+    }
+    
+    registros[index] = datosActualizados;
+    
+    await updateDoc(ejercicioRef, {
+        registros: registros
+    });
+    
+    return true;
 }
 
 // Función para configurar event listeners de la vista de ejercicio
@@ -2456,7 +2792,21 @@ async function manejarSubmitRegistro(e) {
         ? actualizarRegistroEnEjercicio(entrenoActual.id, ejercicioActual.id, registroIdParaFirebase, datosRegistro)
         : agregarRegistroAEjercicio(entrenoActual.id, ejercicioActual.id, datosRegistro);
     
-    promesaFirebase.catch(error => {
+    // Refrescar desde la biblioteca global después de sincronizar
+    promesaFirebase.then(async () => {
+        // Si el ejercicio tiene bibliotecaId y categoriaId, refrescar desde la fuente de verdad
+        if (ejercicioActual.bibliotecaId && ejercicioActual.categoriaId) {
+            try {
+                const registrosGlobales = await obtenerHistorialGlobal(ejercicioActual.categoriaId, ejercicioActual.bibliotecaId);
+                registrosEjercicioGlobal = registrosGlobales;
+                ejercicioActual.registros = registrosGlobales;
+                paginaActualEjercicio = 1;
+                renderizarRegistrosPaginados();
+            } catch (error) {
+                console.error("Error al refrescar historial global:", error);
+            }
+        }
+    }).catch(error => {
         console.error("❌ Error de sincronización en segundo plano:", error);
         // Notificar al usuario sin bloquear la UI
         alert("Hubo un problema sincronizando con la nube, pero tus datos están guardados localmente.");
@@ -2580,7 +2930,17 @@ async function eliminarRegistro(registroId, botonElement) {
         
         // Actualizar el ejercicio actual
         ejercicioActual = await obtenerEjercicio(entrenoActual.id, ejercicioActual.id);
-        const registros = ejercicioActual.registros || [];
+        
+        // Si el ejercicio tiene bibliotecaId y categoriaId, refrescar desde la fuente de verdad
+        let registros = [];
+        if (ejercicioActual.bibliotecaId && ejercicioActual.categoriaId) {
+            // Leer desde la biblioteca global
+            registros = await obtenerHistorialGlobal(ejercicioActual.categoriaId, ejercicioActual.bibliotecaId);
+            ejercicioActual.registros = registros;
+        } else {
+            // Fallback: usar registros locales
+            registros = ejercicioActual.registros || [];
+        }
         
         // Actualizar la variable global de registros
         registrosEjercicioGlobal = registros;
@@ -2622,10 +2982,17 @@ async function eliminarEjercicio(ejercicioId, botonElement) {
     try {
         // 2. Hacer el trabajo
         await eliminarEjercicioDeEntreno(entrenoActual.id, ejercicioId);
-        const ejercicios = await obtenerEjerciciosDeEntreno(entrenoActual.id);
-        renderizarListaEjercicios(ejercicios, null, eliminarEjercicio, mostrarVistaEjercicio, sustituirEjercicio);
         
-        // Actualizar barra de progreso
+        // 3. Recargar datos frescos para asegurar que el eliminado ya no esté
+        const ejerciciosActualizados = await obtenerEjerciciosDeEntreno(entrenoActual.id);
+        
+        // 4. Renderizar la lista principal con datos actualizados
+        renderizarListaEjercicios(ejerciciosActualizados, null, eliminarEjercicio, mostrarVistaEjercicio, sustituirEjercicio);
+        
+        // 5. Reconfigurar el botón de reordenar con los ejercicios actualizados
+        configurarBotonReordenarEntreno(entrenoActual, ejerciciosActualizados);
+        
+        // 6. Actualizar barra de progreso
         actualizarBarraProgreso();
     } catch (error) {
         // 3. Manejar el error

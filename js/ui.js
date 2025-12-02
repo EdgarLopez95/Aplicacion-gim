@@ -655,7 +655,7 @@ export function renderizarCategoriaEjerciciosView(categoriaNombre) {
 }
 
 // Función para renderizar la lista de ejercicios de categoría (reemplaza el spinner)
-export function renderizarListaEjerciciosCategoria(ejercicios, onEditarClick, onEliminarClick) {
+export function renderizarListaEjerciciosCategoria(ejercicios, onEditarClick, onEliminarClick, onEjercicioClick) {
     actualizarReferenciasDOM();
     
     const listaContainer = document.getElementById('lista-ejercicios-categoria-container');
@@ -675,6 +675,7 @@ export function renderizarListaEjerciciosCategoria(ejercicios, onEditarClick, on
     ejercicios.forEach(ejercicio => {
         const card = document.createElement('div');
         card.className = 'ejercicio-card library-mode';
+        card.style.cursor = onEjercicioClick ? 'pointer' : 'default';
         card.dataset.ejercicioId = ejercicio.id;
         
         const imagenUrl = obtenerImagenSegura(ejercicio.imagenUrl);
@@ -701,6 +702,16 @@ export function renderizarListaEjerciciosCategoria(ejercicios, onEditarClick, on
                 </button>
             </div>
         `;
+        
+        // Agregar event listener para hacer clic en la tarjeta (navegar a vista de ejercicio)
+        if (onEjercicioClick) {
+            card.addEventListener('click', function(e) {
+                // No navegar si se hace clic en los botones
+                if (!e.target.closest('.ejercicio-card-actions')) {
+                    onEjercicioClick(ejercicio.id);
+                }
+            });
+        }
         
         listaContainer.appendChild(card);
     });
@@ -1780,8 +1791,6 @@ export function renderizarPerfilView(datosPerfil = {}, perfilActual = null) {
         </div>
         
         ${renderizarTablaHistorial(datosPerfil.historial || [])}
-        
-        <button id="btn-borrar-historial" class="btn btn-borrar-historial">Borrar Historial (Dev)</button>
         
         <button id="btn-editar-perfil" class="btn btn-editar-perfil">Editar Perfil</button>
         <button id="btn-registrar-medicion" class="btn btn-registrar-medicion">Registrar Medición</button>
