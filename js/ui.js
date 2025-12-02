@@ -2359,3 +2359,87 @@ export function ocultarModalReordenar() {
     }
 }
 
+/**
+ * Lanza una animación de confeti explosivo
+ */
+export function lanzarConfeti() {
+    const duration = 3 * 1000;
+    const animationEnd = Date.now() + duration;
+    const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 9999 };
+
+    function randomInRange(min, max) {
+        return Math.random() * (max - min) + min;
+    }
+
+    const interval = setInterval(function() {
+        const timeLeft = animationEnd - Date.now();
+
+        if (timeLeft <= 0) {
+            return clearInterval(interval);
+        }
+
+        const particleCount = 50 * (timeLeft / duration);
+        // Confeti desde dos orígenes (izquierda y derecha)
+        confetti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } }));
+        confetti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } }));
+    }, 250);
+}
+
+/**
+ * Muestra el modal de felicitaciones al completar un entreno
+ * @param {string} nombreEntreno - Nombre del entreno completado
+ * @param {number} cantidadSemanal - Cantidad de entrenos completados esta semana
+ */
+export function mostrarModalFelicitaciones(nombreEntreno, cantidadSemanal) {
+    const modal = document.getElementById('modal-felicitaciones');
+    const mensaje = document.getElementById('felicitacion-mensaje');
+    const contador = document.getElementById('felicitacion-contador');
+    const btnCerrar = document.getElementById('btn-cerrar-felicitacion');
+    
+    if (!modal) return;
+    
+    // Actualizar mensaje
+    if (mensaje) {
+        mensaje.textContent = `Has completado ${nombreEntreno}`;
+    }
+    
+    // Actualizar contador semanal
+    if (contador) {
+        const texto = cantidadSemanal === 1 
+            ? 'Llevas 1 entreno esta semana' 
+            : `Llevas ${cantidadSemanal} entrenos esta semana`;
+        contador.textContent = texto;
+    }
+    
+    // Mostrar modal
+    modal.classList.add('active');
+    
+    // Configurar botón de cierre
+    if (btnCerrar) {
+        // Remover listeners anteriores para evitar duplicados
+        const nuevoBtn = btnCerrar.cloneNode(true);
+        btnCerrar.parentNode.replaceChild(nuevoBtn, btnCerrar);
+        
+        nuevoBtn.addEventListener('click', function() {
+            ocultarModalFelicitaciones();
+        });
+    }
+    
+    // Cerrar al hacer clic fuera del modal
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) {
+            ocultarModalFelicitaciones();
+        }
+    });
+}
+
+/**
+ * Oculta el modal de felicitaciones
+ */
+export function ocultarModalFelicitaciones() {
+    const modal = document.getElementById('modal-felicitaciones');
+    if (modal) {
+        modal.classList.remove('active');
+    }
+}
+

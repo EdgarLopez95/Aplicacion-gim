@@ -87,7 +87,10 @@ import {
     showToast,
     renderizarModalReordenar,
     renderizarListaReordenar,
-    ocultarModalReordenar
+    ocultarModalReordenar,
+    lanzarConfeti,
+    mostrarModalFelicitaciones,
+    ocultarModalFelicitaciones
 } from './ui.js';
 
 import {
@@ -3004,8 +3007,48 @@ async function eliminarEjercicio(ejercicioId, botonElement) {
     }
 }
 
+// Función auxiliar para contar entrenos de la semana actual
+async function contarEntrenosSemanaActual() {
+    try {
+        // Obtener todos los días entrenados
+        const diasEntrenados = await obtenerDiasEntrenados();
+        
+        if (!diasEntrenados || diasEntrenados.length === 0) {
+            return 1; // Si no hay días, asumimos que este es el primero
+        }
+        
+        // Obtener fecha de hoy en formato YYYY-MM-DD
+        const hoy = obtenerFechaLocal();
+        const hoyDate = new Date(hoy + 'T12:00:00');
+        
+        // Calcular el lunes de la semana actual
+        // getDay() devuelve 0 (domingo) a 6 (sábado)
+        const diaSemana = hoyDate.getDay();
+        const diasDesdeLunes = diaSemana === 0 ? 6 : diaSemana - 1; // Si es domingo, retroceder 6 días
+        const lunesDate = new Date(hoyDate);
+        lunesDate.setDate(hoyDate.getDate() - diasDesdeLunes);
+        lunesDate.setHours(0, 0, 0, 0);
+        
+        // Convertir lunes a formato YYYY-MM-DD
+        const lunesString = obtenerFechaLocal(lunesDate);
+        
+        // Filtrar días desde el lunes hasta hoy (inclusive)
+        const diasSemanaActual = diasEntrenados.filter(dia => {
+            const fechaDia = dia.fecha; // Ya está en formato YYYY-MM-DD
+            return fechaDia >= lunesString && fechaDia <= hoy;
+        });
+        
+        // Contar días únicos (puede haber múltiples entrenos en un día)
+        const diasUnicos = new Set(diasSemanaActual.map(d => d.fecha));
+        return diasUnicos.size;
+    } catch (error) {
+        console.error('Error al contar entrenos de la semana:', error);
+        return 1; // Fallback: asumir que este es el primero
+    }
+}
+
 // Función para actualizar la barra de progreso
-function actualizarBarraProgreso() {
+async function actualizarBarraProgreso(celebrar = false) {
     const listaContainer = document.getElementById('lista-ejercicios-container');
     if (!listaContainer) {
         return;
@@ -3040,6 +3083,22 @@ function actualizarBarraProgreso() {
     const progressText = document.getElementById('progress-text');
     if (progressText) {
         progressText.textContent = `${completadas} de ${total} ejercicios`;
+    }
+    
+    // Si llegamos al 100% y la bandera 'celebrar' es verdadera, lanzamos confeti y modal
+    if (porcentaje === 100 && celebrar) {
+        // Lanzar confeti inmediatamente
+        lanzarConfeti();
+        
+        // Obtener cantidad de entrenos de la semana y mostrar modal
+        try {
+            const cantidadSemanal = await contarEntrenosSemanaActual();
+            const nombreEntreno = entrenoActual ? entrenoActual.nombre : 'tu rutina';
+            mostrarModalFelicitaciones(nombreEntreno, cantidadSemanal);
+        } catch (error) {
+            console.error('Error al mostrar modal de felicitaciones:', error);
+            // Si falla, al menos el confeti ya se lanzó
+        }
     }
 }
 
@@ -3100,8 +3159,8 @@ async function toggleCompletado(entrenoId, ejercicioId) {
         const onToggle = (id) => toggleCompletado(entrenoId, id);
         renderizarListaEjercicios(ejerciciosParaUsar, null, eliminarEjercicio, mostrarVistaEjercicio, sustituirEjercicio, onToggle);
         
-        // Actualizar barra de progreso
-        actualizarBarraProgreso();
+        // Actualizar barra de progreso (con celebración si llega al 100%)
+        actualizarBarraProgreso(true);
         
         // Paso 4: Enviar a Firebase (sin await bloqueante)
         toggleCompletadoEjercicio(entrenoId, ejercicioId, estado, entrenoNombre, totalEjercicios).catch(error => {

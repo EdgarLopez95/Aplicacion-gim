@@ -169,6 +169,24 @@
             };
         }
     </script>
+    <!-- Canvas Confetti Library -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    
+    <!-- Modal de Felicitaciones -->
+    <div id="modal-felicitaciones" class="modal">
+        <div class="modal-content" style="text-align: center;">
+            <div style="font-size: 60px; margin-bottom: 10px;">🏆</div>
+            <h3 style="color: var(--accent-color); margin-bottom: 10px;">¡ENTRENO COMPLETADO!</h3>
+            <p id="felicitacion-mensaje" style="font-size: 18px; margin-bottom: 20px; color: var(--text-primary);">Has terminado tu rutina de Hoy</p>
+            
+            <div style="background: rgba(255,255,255,0.1); padding: 15px; border-radius: 12px; margin-bottom: 24px;">
+                <span style="display: block; font-size: 12px; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 4px;">Racha Semanal</span>
+                <span id="felicitacion-contador" style="font-size: 24px; font-weight: 800; color: var(--text-primary);">Llevas 1 entreno esta semana</span>
+            </div>
+
+            <button id="btn-cerrar-felicitacion" class="btn" style="width: 100%;">¡A seguir así! 💪</button>
+        </div>
+    </div>
 </body>
 </html>
 
